@@ -1,0 +1,152 @@
+Skip to main content 
+
+Tavily Docs home page 
+
+Search...
+
+⌘ K Ask Assistant 
+
+- Support 
+
+- Get an API key 
+
+- Get an API key 
+
+Search... 
+
+Navigation 
+
+Home 
+Introduction 
+API & SDKs 
+Ecosystem 
+Examples 
+Changelog 
+Help 
+
+- API Playground 
+
+- Community 
+
+- Blog 
+
+## Welcome 
+
+## Documentation Index
+Fetch the complete documentation index at: https://docs.tavily.com/llms.txt 
+Use this file to discover all available pages before exploring further.
+
+## Build with Tavily 
+Your journey to state-of-the-art web search starts right here. 
+
+Installation 
+
+## Python SDK
+
+pip install tavily-python 
+
+## JavaScript SDK
+
+npm i @ tavily / core 
+
+Try it now 
+
+- Search the web
+
+- Extract webpages
+
+- Crawl webpages
+
+- Map webpages
+
+- Create Research Task
+
+Python
+
+JavaScript
+cURL
+
+from tavily import TavilyClient 
+
+tavily_client = TavilyClient( api_key = "tvly-YOUR_API_KEY" ) 
+response = tavily_client.search( "Who is Leo Messi?" ) 
+
+print (response) 
+
+Learn more about the Search API → 
+Python
+
+JavaScript
+cURL
+
+from tavily import TavilyClient 
+
+tavily_client = TavilyClient( api_key = "tvly-YOUR_API_KEY" ) 
+response = tavily_client.extract( "https://en.wikipedia.org/wiki/Artificial_intelligence" ) 
+
+print (response) 
+
+Learn more about the Extract API → 
+Python
+
+JavaScript
+cURL
+
+from tavily import TavilyClient 
+
+tavily_client = TavilyClient( api_key = "tvly-YOUR_API_KEY" ) 
+response = tavily_client.crawl( "https://docs.tavily.com" , instructions = "Find all pages on the Python SDK" ) 
+
+print (response) 
+
+Learn more about the Crawl API → 
+Python
+
+JavaScript
+cURL
+
+from tavily import TavilyClient 
+
+tavily_client = TavilyClient( api_key = "tvly-YOUR_API_KEY" ) 
+response = tavily_client.map( "https://docs.tavily.com" ) 
+
+print (response) 
+
+Learn more about the Map API → 
+Python
+
+JavaScript
+cURL
+
+from tavily import TavilyClient 
+
+tavily_client = TavilyClient( api_key = "tvly-YOUR_API_KEY" ) 
+response = tavily_client.research( "What are the latest developments in AI?" ) 
+
+print (response) 
+
+Learn more about the Research API → 
+
+## Developer Resources
+
+## API Credits Overview
+Learn how Tavily API credits work. 
+
+## Rate Limits
+Understand Tavily’s rate limits and policies. 
+
+## Playground
+Try Tavily’s APIs interactively. 
+
+Question? Contact Us 
+Integration issues? Join Community 
+Using LLMs? Read LLMs.txt 
+Something not right? Check Status 
+
+© Tavily Privacy Policy · Website Terms of Use · Platform Terms of Use · Cookie Notice · Cookies Settings · Accessibility Menu 
+
+⌘ I 
+
+Assistant 
+
+Responses are generated using AI and may contain mistakes.

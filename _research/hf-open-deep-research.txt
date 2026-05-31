@@ -1,0 +1,904 @@
+Hugging Face 
+
+- Models 
+
+- Datasets 
+
+- Spaces 
+
+- Buckets new 
+
+- Docs 
+
+- Enterprise 
+
+- Pricing 
+
+- 
+- Website 
+
+- Tasks 
+
+- HuggingChat 
+
+- Collections 
+
+- Languages 
+
+- Organizations 
+
+- Community 
+
+- Blog 
+
+- Posts 
+
+- Daily Papers 
+
+- Learn 
+
+- Discord 
+
+- Forum 
+
+- GitHub 
+
+- Solutions 
+
+- Team & Enterprise 
+
+- Hugging Face PRO 
+
+- Enterprise Support 
+
+- Inference Providers 
+
+- Inference Endpoints 
+
+- Storage Buckets 
+
+- 
+
+- Log In 
+
+- Sign Up 
+
+Back to Articles 
+
+## 
+
+Open-source DeepResearch – Freeing our search agents
+
+Published
+February 4, 2025 
+Update on GitHub 
+Upvote 1323
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- +1317 
+
+Aymeric Roucher m-ric Follow 
+
+Albert Villanova del Moral albertvillanova Follow 
+
+merve merve Follow 
+
+Thomas Wolf thomwolf Follow 
+
+Clémentine Fourrier clefourrier Follow 
+
+## 
+- TLDR 
+
+- Table of Contents 
+
+- What are Agent frameworks and why they matter? 
+
+- The GAIA benchmark 
+
+- Building an open Deep Research 
+- Using a CodeAgent 
+
+- Making the right tools 🛠️ 
+
+- Results 🏅 
+
+- Community Reproductions 
+
+- Most important next steps 
+
+TLDR
+
+Yesterday, OpenAI released Deep Research , a system that browses the web to summarize content and answer questions based on the summary. The system is impressive and blew our minds when we tried it for the first time.
+
+One of the main results in the blog post is a strong improvement of performances on the General AI Assistants benchmark (GAIA) , a benchmark we’ve been playing with recently as well, where they successfully reached near 67% correct answers on 1-shot on average, and 47.6% on especially challenging “level 3” questions that involve multiple steps of reasoning and tool usage (see below for a presentation of GAIA).
+
+DeepResearch is composed of an LLM (which can be selected from the current list of LLMs provided by OpenAI, 4o, o1, o3, etc) and an internal “agentic framework” which guide the LLM to use tools like web search and organize its actions in steps. 
+
+While powerful LLMs are now freely available in open-source (see e.g. the recent DeepSeek R1 model ), OpenAI didn’t disclose much about the agentic framework underlying Deep Research…
+
+So we decided to embark on a 24-hour mission to reproduce their results and open-source the needed framework along the way!
+
+The clock is ticking, let’s go! ⏱️
+
+## 
+
+Table of Contents
+
+- Open-source DeepResearch – Freeing our search agents 
+
+- TLDR 
+
+- Table of Contents 
+
+- What are Agent frameworks and why they matter? 
+
+- The GAIA benchmark 
+
+- Building an open Deep Research 
+
+- Using a CodeAgent 
+
+- Making the right tools 🛠️ 
+
+- Results 🏅 
+
+- Community Reproductions 
+
+- Most important next steps 
+
+## 
+
+What are Agent frameworks and why they matter?
+
+An Agent framework is a layer on top of an LLM to make said LLM execute actions (like browse the web or read PDF documents), and organize its operations in a series of steps.
+For a quick intro to agents, check this great interview by Andrew Ng and our introduction blog post to the smolagents library. For a more detailed dive in agents you can subscribe to our agents course that starts in just a few days: link here .
+
+Almost everyone has already experienced how powerful LLMs can be simply by playing with chatbots.. However, what not everyone is aware of yet is that integrating these LLMs into agentic systems can give them real superpowers! 
+
+Here is a recent example comparing the performance of a few frontier LLMs with and without an agentic framework (in this case the simple smolagents library) - using an agentic framework bumps performance by up to 60 points!
+
+In fact, OpenAI also highlighted in its release blogpost how Deep Research performed dramatically better than standalone LLMs on the knowledge-intensive " Humanity’s Last Exam " benchmark.
+
+So, what happens when we integrate our current top LLM in an agentic framework, to work toward an open-DeepResearch ?
+
+A quick note: We’ll benchmark our results on the same GAIA challenge but keep in mind that this is a work in progress. DeepResearch is a massive achievement and its open reproduction will take time. In particular, full parity will require improved browser use and interaction like OpenAI Operator is providing, i.e. beyond the current text-only web interaction we explore in this first step.
+
+Let’s first understand the scope of the challenge: GAIA.
+
+## 
+
+The GAIA benchmark
+
+GAIA is arguably the most comprehensive benchmark for agents. Its questions are very difficult and hit on many challenges of LLM-based systems. Here is an example of a hard question:
+
+Which of the fruits shown in the 2008 painting "Embroidery from Uzbekistan" were served as part of the October 1949 breakfast menu for the ocean liner that was later used as a floating prop for the film "The Last Voyage"? Give the items as a comma-separated list, ordering them in clockwise order based on their arrangement in the painting starting from the 12 o'clock position. Use the plural form of each fruit.
+
+You can see this question involves several challenges:
+
+- Answering in a constrained format,
+
+- Using multimodal capabilities (to extract the fruits from the image),
+
+- Gathering several pieces of information, some depending on others: 
+
+- Identifying the fruits on the picture
+
+- Finding which ocean liner was used as a floating prop for “The Last Voyage”
+
+- Finding the October 1949 breakfast menu for the above ocean liner
+
+- Chaining together a problem-solving trajectory in the correct order.
+
+Solving this requires both high-level planning abilities and rigorous execution, which are two areas where LLMs struggle when used alone.
+
+So it’s an excellent test set for agent systems!
+
+On GAIA’s public leaderboard , GPT-4 does not even reach 7% on the validation set when used without any agentic setup. On the other side of the spectrum, with Deep Research, OpenAI reached 67.36% score on the validation set, so an order of magnitude better! (Though we don’t know how they would actually fare on the private test set.)
+
+Let’s see if we can do better with open source tools!
+
+## 
+
+Building an open Deep Research
+
+## 
+
+Using a CodeAgent
+
+The first improvement over traditional AI agent systems we’ll tackle is to use a so-called “code agent”. As shown by Wang et al. (2024) , letting the agent express its actions in code has several advantages, but most notably that code is specifically designed to express complex sequences of actions .
+
+Consider this example given by Wang et al.:
+
+This highlights several advantages of using code:
+
+- Code actions are much more concise than JSON. 
+
+- Need to run 4 parallel streams of 5 consecutive actions ? In JSON, you would need to generate 20 JSON blobs, each in their separate step; in Code it’s only 1 step.
+
+- On average, the paper shows that Code actions require 30% fewer steps than JSON, which amounts to an equivalent reduction in the tokens generated. Since LLM calls are often the dimensioning cost of agent systems, it means your agent system runs are ~30% cheaper.
+
+- Code enables to re-use tools from common libraries
+
+- Better performance in benchmarks, due to two reasons: 
+
+- More intuitive way to express actions
+
+- Extensive exposure of LLMs to code in training
+
+The advantages above were confirmed by our experiments on the agent_reasoning_benchmark .
+
+From building smolagents we can also cite a notable additional advantage, which is a better handling of state: this is very useful for multimodal tasks in particular. Need to store this image/audio/other for later use? No problem, just assign it as a variable in your state and you can re-use it 4 steps later if needed. In JSON you would have to let the LLM name it in a dictionary key and trust the LLM will later understand that it can still use it.
+
+## 
+
+Making the right tools 🛠️
+
+Now we need to provide the agent with the right set of tools. 
+
+1. A web browser. While a fully fledged web browser interaction like Operator will be needed to reach full performance, we started with an extremely simple text-based web browser for now for our first proof-of-concept. You can find the code here 
+
+2. A simple text inspector, to be able to read a bunch of text file format , find it here .
+
+These tools were taken from the excellent Magentic-One agent by Microsoft Research, kudos to them! We didn’t change them much, as our goal was to get as high a performance as we can with the lowest complexity possible.
+
+Here is a short roadmap of improvements which we feel would really improve these tools’ performance (feel free to open a PR and contribute!):
+
+- extending the number of file formats which can be read.
+
+- proposing a more fine-grained handling of files.
+
+- replacing the web browser with a vision-based one, which we’ve started doing here .
+
+## 
+
+Results 🏅
+
+In our 24h+ reproduction sprint, we’ve already seen steady improvements in the performance of our agent on GAIA!
+
+We’ve quickly gone up from the previous SoTA with an open framework, around 46% for Magentic-One, to our current performance of 55.15% on the validation set .
+
+This bump in performance is due mostly to letting our agents write their actions in code! Indeed, when switching to a standard agent that writes actions in JSON instead of code, performance of the same setup is instantly degraded to 33% average on the validation set.
+
+Here is the final agentic system. 
+
+We’ve set up a live demo here for you to try it out!
+
+However, this is only the beginning, and there are a lot of things to improve! Our open tools can be made better, the smolagents framework can also be tuned, and we’d love to explore the performance of better open models to support the agent.
+
+We welcome the community to come join us in this endeavour, so we can leverage the power of open research together to build a great open-source agentic framework! It would allow anyone to run a DeepResearch-like agent at home, with their favorite models, using a completely local and customized approach!
+
+## 
+
+Community Reproductions
+
+While we were working on this and focusing on GAIA, other great open implementations of Deep Research emerged from the community, specifically from 
+
+- dzhng ,
+
+- assafelovic ,
+
+- nickscamara ,
+
+- jina-ai and
+
+- mshumer .
+
+Each of these implementations use different libraries for indexing data, browsing the web and querying LLMs. In this project, we would like to reproduce the benchmarks presented by OpenAI (pass@1 average score), benchmark and document our findings with switching to open LLMs (like DeepSeek R1), using vision LMs, benchmark traditional tool calling against code-native agents. 
+
+## 
+
+Most important next steps
+
+OpenAI’s Deep Research is probably boosted by the excellent web browser that they introduced with Operator .
+
+So we’re tackling that next! In a more general problem: we’re going to build GUI agents, i.e. “agents that view your screen and can act directly with mouse & keyboard”. If you’re excited about this project, and want to help everyone get access to such cool capabilities through open source, we’d love to get your contribution!
+
+We’re also hiring a full time engineer to help us work on this and more, apply if you’re interested 🙂
+
+- To get started with Open Deep Research, try the examples here .
+
+- Check the smolagents repo.
+
+- Read more about smolagents docs , introduction blog post .
+
+## Models mentioned in this article 1 
+
+## deepseek-ai/DeepSeek-R1
+Text Generation • 685B • Updated Mar 27, 2025 • 5.15M • 13.4k 
+
+## Datasets mentioned in this article 2 
+
+## cais/hle
+Benchmark • Updated Jan 20 • 2.5k • 41.3k • 812 
+
+## gaia-benchmark/GAIA
+Viewer • Updated Oct 28, 2025 • 932 • 49.6k • 677 
+
+## Papers mentioned in this article 1 
+
+## Executable Code Actions Elicit Better LLM Agents
+Paper • 2402.01030 • Published Feb 1, 2024 • 195 
+
+More Articles from our Blog
+
+agents smolagents nlp 
+
+## Our Transformers Code Agent beats the GAIA benchmark 🏅
+
+- 
+
+- 
+
+- 
+
+100
+July 1, 2024 
+
+agents llms guide 
+
+## Harness, Scaffold, and the AI Agent Terms Worth Getting Right
+
+- 
+
+- 
+
+- 
+
+81
+May 25, 2026 
+
+## Community
+DeepSeek's reasoning skills are probably particularly useful for something like this. But in my mind, particularly for academic research type tasks, the propaganda baked into the model is a non-starter. I tested out the new<br>DeepSeek-R1-Distill-Llama-70B-Uncensored-v2-Unbiased model yesterday. It was a very crude test, but I was quite impressed. I'm a newb over here, so take this as a light suggestion, just in case its helpful, nothing more.</p>\n","updatedAt":"2025-02-04T21:18:48.328Z","author":{"_id":"679b9535272a3bfb5054f52c","avatarUrl":"/avatars/5f4bf146352c4e47cb9e0daf6d8c1a0d.svg","fullname":"Sam Fieldman","name":"sfield","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9706379771232605},"editors":["sfield"],"editorAvatarUrls":["/avatars/5f4bf146352c4e47cb9e0daf6d8c1a0d.svg"],"reactions":[{"reaction":"👍","users":["danschmidt88","Agenciarc360","Farel106","muhtasham"],"count":4}],"isReport":false},"replies":[{"id":"67a3e26f4fce07a7be77f547","author":{"_id":"673b11525d150a0c7eb1f663","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png","fullname":"Tom Green","name":"TGAI87","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-02-05T22:13:03.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Yep I'm very impressed with it too. Follows direction exceptionally well, and corrects (intentional) mistakes. Going to try to get it working nicely on my RTX 4090 with offloading. ","html":"<p>Yep I'm very impressed with it too. Follows direction exceptionally well, and corrects (intentional) mistakes. Going to try to get it working nicely on my RTX 4090 with offloading. </p>\n","updatedAt":"2025-02-05T22:13:03.688Z","author":{"_id":"673b11525d150a0c7eb1f663","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png","fullname":"Tom Green","name":"TGAI87","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9488416910171509},"editors":["TGAI87"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png"],"reactions":[],"isReport":false,"parentCommentId":"67a28438c325b01e89f82bf9"}},{"id":"67a676aa0a16b401744a09ca","author":{"_id":"67a66aa05340e80a3ca0f019","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/ipekWBV3cvMJxT4FsRwdf.png","fullname":"Bolek lolek","name":"Biafra","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-07T21:10:02.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"What do you mean \"with offloading\" i also have a single rtx 4090 do you offload to RAM memory or something?","html":"<p>What do you mean \"with offloading\" i also have a single rtx 4090 do you offload to RAM memory or something?</p>\n","updatedAt":"2025-02-07T21:10:02.270Z","author":{"_id":"67a66aa05340e80a3ca0f019","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/ipekWBV3cvMJxT4FsRwdf.png","fullname":"Bolek lolek","name":"Biafra","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9288342595100403},"editors":["Biafra"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/ipekWBV3cvMJxT4FsRwdf.png"],"reactions":[],"isReport":false,"parentCommentId":"67a28438c325b01e89f82bf9"}},{"id":"67a83de605dc38b5fe1c419c","author":{"_id":"64b6161b2b7a367b404507a5","avatarUrl":"/avatars/a1a7de6d67e7dd033463aa1b29281215.svg","fullname":"Enzo Michelangeli","name":"enzomich","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-09T05:32:22.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"DeepSeek-R1-Distill-Llama-70B and its derivatives are not DeepSeek R1: they are Meta Llama models finetuned to add DeepSeek R1's reasoning (CoT) capabilities. This process of transferring knowledge from a larger model to a smaller one is called \"distillation\", and has been used also for other Llama and Qwen2.5 smaller models.\n\nIt's also possible to run on limited hardware (better if having ~100 Gb of RAM) a quantized version of the real thing, the 671B DeepSeek R1: see https://unsloth.ai/blog/deepseekr1-dynamic . I managed to run it on a gaming laptop (an MSI Katana 15 with 64 Gb RAM) but it's very slow, generating around 0.22 tokens per second (meaning 0.7 to 0.9 characters per second). On a 128 Gb NVIDIA DIGITS box, promised for May at ~$3,000 (https://nvidianews.nvidia.com/news/nvidia-puts-grace-blackwell-on-every-desk-and-at-every-ai-developers-fingertips ), it should have an more acceptable throughput.","html":"<p>DeepSeek-R1-Distill-Llama-70B and its derivatives are not DeepSeek R1: they are Meta Llama models finetuned to add DeepSeek R1's reasoning (CoT) capabilities. This process of transferring knowledge from a larger model to a smaller one is called \"distillation\", and has been used also for other Llama and Qwen2.5 smaller models.</p>\n<p>It's also possible to run on limited hardware (better if having ~100 Gb of RAM) a quantized version of the real thing, the 671B DeepSeek R1: see <a href=\"https://unsloth.ai/blog/deepseekr1-dynamic\" rel=\"nofollow\">https://unsloth.ai/blog/deepseekr1-dynamic</a> . I managed to run it on a gaming laptop (an MSI Katana 15 with 64 Gb RAM) but it's very slow, generating around 0.22 tokens per second (meaning 0.7 to 0.9 characters per second). On a 128 Gb NVIDIA DIGITS box, promised for May at ~$3,000 (<a href=\"https://nvidianews.nvidia.com/news/nvidia-puts-grace-blackwell-on-every-desk-and-at-every-ai-developers-fingertips\" rel=\"nofollow\">https://nvidianews.nvidia.com/news/nvidia-puts-grace-blackwell-on-every-desk-and-at-every-ai-developers-fingertips</a> ), it should have an more acceptable throughput.</p>\n","updatedAt":"2025-02-09T05:32:22.559Z","author":{"_id":"64b6161b2b7a367b404507a5","avatarUrl":"/avatars/a1a7de6d67e7dd033463aa1b29281215.svg","fullname":"Enzo Michelangeli","name":"enzomich","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.905289351940155},"editors":["enzomich"],"editorAvatarUrls":["/avatars/a1a7de6d67e7dd033463aa1b29281215.svg"],"reactions":[],"isReport":false,"parentCommentId":"67a28438c325b01e89f82bf9"}}]},{"id":"67a2bcabcad2cf0caec94769","author":{"_id":"6417ccd0b03817ada645027d","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1679281165491-noauth.jpeg","fullname":"Elan Moritz","name":"ElanInPhilly","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-02-05T01:19:39.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"This sounds pretty interesting, so I up voted based on description. However, the demo implementation definitely needs attention and work. Now, on several occasions, after long waits in 100+ user queues, I repeatedly get \"Error in generating model output:\nlitellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': \"This model's maximum context length is 128000 tokens. However, your messages resulted in 419624 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}\". So this seems pretty basic, *. * the demo definitely to be crafted so the model can handle the correct token limits at the right time and place. Absent that ....\n","html":"<p>This sounds pretty interesting, so I up voted based on description. However, the demo implementation definitely needs attention and work. Now, on several occasions, after long waits in 100+ user queues, I repeatedly get \"Error in generating model output:<br>litellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': \"This model's maximum context length is 128000 tokens. However, your messages resulted in 419624 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}\". So this seems pretty basic, *. * the demo definitely to be crafted so the model can handle the correct token limits at the right time and place. Absent that ....</p>\n","updatedAt":"2025-02-05T01:19:39.595Z","author":{"_id":"6417ccd0b03817ada645027d","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1679281165491-noauth.jpeg","fullname":"Elan Moritz","name":"ElanInPhilly","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8108208179473877},"editors":["ElanInPhilly"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/1679281165491-noauth.jpeg"],"reactions":[{"reaction":"👍","users":["tuangu","yashb1912","danschmidt88","ewgrgw","timok91","DarkSteelDragon","akumch"],"count":7}],"isReport":false}},{"id":"67a2f73cb020a456e004526f","author":{"_id":"6304f9fc9aef62c40140cd3f","avatarUrl":"/avatars/26bcafddbba9cb9db010a3ad0591e102.svg","fullname":"Jonas D","name":"jonwondo","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-05T05:29:32.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I'm getting the same errors as the person above on the demo site. Must be a bug as I tried different prompts and had to wait ~1hr for each one due to the queue:\nError in generating model output:\nlitellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': \"This model's maximum context length is 128000 tokens. However, your messages resulted in 709582 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}","html":"<p>I'm getting the same errors as the person above on the demo site. Must be a bug as I tried different prompts and had to wait ~1hr for each one due to the queue:<br>Error in generating model output:<br>litellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': \"This model's maximum context length is 128000 tokens. However, your messages resulted in 709582 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}</p>\n","updatedAt":"2025-02-05T05:29:32.529Z","author":{"_id":"6304f9fc9aef62c40140cd3f","avatarUrl":"/avatars/26bcafddbba9cb9db010a3ad0591e102.svg","fullname":"Jonas D","name":"jonwondo","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.7395344972610474},"editors":["jonwondo"],"editorAvatarUrls":["/avatars/26bcafddbba9cb9db010a3ad0591e102.svg"],"reactions":[{"reaction":"👍","users":["danschmidt88","ewgrgw","timok91","sayhan","galgol","piaopiaoaka"],"count":6}],"isReport":false}},{"id":"67a3427d592f8e9ce2b0253a","author":{"_id":"64175bc2b03817ada642291f","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/64175bc2b03817ada642291f/V3mhc8Y0saSgXbp--2HcE.png","fullname":"Kh","name":"raidhon","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":6,"isUserFollowing":false},"createdAt":"2025-02-05T10:50:37.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Very cool thanks! I think OpenAI already hate Open Source :)))))\nProducts that are trying so hard to monetize are created in one day.","html":"<p>Very cool thanks! I think OpenAI already hate Open Source :)))))<br>Products that are trying so hard to monetize are created in one day.</p>\n","updatedAt":"2025-02-05T10:50:37.408Z","author":{"_id":"64175bc2b03817ada642291f","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/64175bc2b03817ada642291f/V3mhc8Y0saSgXbp--2HcE.png","fullname":"Kh","name":"raidhon","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":6,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9742960929870605},"editors":["raidhon"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/64175bc2b03817ada642291f/V3mhc8Y0saSgXbp--2HcE.png"],"reactions":[{"reaction":"👍","users":["timeschuantou","tianzeds","Arm4da","cosa31"],"count":4}],"isReport":false}},{"id":"67a3773e52adaa72db8a9736","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false},"createdAt":"2025-02-05T14:35:42.000Z","type":"comment","data":{"edited":true,"hidden":false,"latest":{"raw":"This is a big step toward more capable AI agents. At [Automatio.ai](https://automatio.ai/), we're working on integrating similar autonomous web agents to streamline data extraction and web automation, letting users build powerful scrapers without coding. The challenge is making sure these agents can navigate complex websites reliably. How do you see open-source AI helping bridge the gap between research prototypes and real-world automation?","html":"<p>This is a big step toward more capable AI agents. At <a href=\"https://automatio.ai/\" rel=\"nofollow\">Automatio.ai</a>, we're working on integrating similar autonomous web agents to streamline data extraction and web automation, letting users build powerful scrapers without coding. The challenge is making sure these agents can navigate complex websites reliably. How do you see open-source AI helping bridge the gap between research prototypes and real-world automation?</p>\n","updatedAt":"2025-02-05T14:36:53.028Z","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false}},"numEdits":3,"identifiedLanguage":{"language":"en","probability":0.9044724702835083},"editors":["shtefcs"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png"],"reactions":[{"reaction":"👍","users":["Arm4da"],"count":1}],"isReport":false}},{"id":"67a3963be4683ec4b8d36053","author":{"_id":"617c49932ee1adbd7739e7d2","avatarUrl":"/avatars/d4a1195934f581e6ecb393b2e0dfb69d.svg","fullname":"Mohamed El Sobkey","name":"MS100","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-05T16:47:55.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Amazing. I am so interested in participating.","html":"<p>Amazing. I am so interested in participating.</p>\n","updatedAt":"2025-02-05T16:47:55.869Z","author":{"_id":"617c49932ee1adbd7739e7d2","avatarUrl":"/avatars/d4a1195934f581e6ecb393b2e0dfb69d.svg","fullname":"Mohamed El Sobkey","name":"MS100","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9405615925788879},"editors":["MS100"],"editorAvatarUrls":["/avatars/d4a1195934f581e6ecb393b2e0dfb69d.svg"],"reactions":[],"isReport":false}},{"id":"67a3a51c4ba408167097a26c","author":{"_id":"66bdf5cee61ccd71d7a8e345","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png","fullname":"Kostiantyn Sytnyk","name":"Kumala3","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-05T17:51:24.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I am currently exploring Open-Source alternatives to OpenAI DeepResearch as it's a really great product, one of the most useful since ChatGPT was launched in 2022 for me, as the results of research are incredible high-quality not just simple research with \"search\" function.\nI've decided to try out this Open Deep Research via Hugging face space and ran into issue with the returned output exceeded 128K token limit:\n![image.png](https://cdn-uploads.huggingface.co/production/uploads/66bdf5cee61ccd71d7a8e345/pZVkSW0z3vT0lRVgfPU67.png)\n","html":"<p>I am currently exploring Open-Source alternatives to OpenAI DeepResearch as it's a really great product, one of the most useful since ChatGPT was launched in 2022 for me, as the results of research are incredible high-quality not just simple research with \"search\" function.<br>I've decided to try out this Open Deep Research via Hugging face space and ran into issue with the returned output exceeded 128K token limit:<br><a href=\"https://cdn-uploads.huggingface.co/production/uploads/66bdf5cee61ccd71d7a8e345/pZVkSW0z3vT0lRVgfPU67.png\" rel=\"nofollow\"><img src=\"https://cdn-uploads.huggingface.co/production/uploads/66bdf5cee61ccd71d7a8e345/pZVkSW0z3vT0lRVgfPU67.png\" alt=\"image.png\"></a></p>\n","updatedAt":"2025-02-05T17:51:24.171Z","author":{"_id":"66bdf5cee61ccd71d7a8e345","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png","fullname":"Kostiantyn Sytnyk","name":"Kumala3","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9285069704055786},"editors":["Kumala3"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png"],"reactions":[{"reaction":"👍","users":["timok91"],"count":1}],"isReport":false}},{"id":"67a3a576179ddc3cb7afcb02","author":{"_id":"66bdf5cee61ccd71d7a8e345","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png","fullname":"Kostiantyn Sytnyk","name":"Kumala3","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-05T17:52:54.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"@albertvillanova @clefourrier Is there any way to resolve this issue or maybe set the instruction to set the output token limit to ensure it doesn't throw errors and works appropriately even with certain limitations?\nPS. Working with limits is MUCH better than not working at all.","html":"<p><span class=\"SVELTE_PARTIAL_HYDRATER contents\" data-target=\"UserMention\" data-props=\"{"user":"albertvillanova"}\"><span class=\"inline-block\"><span class=\"contents\"><a href=\"/albertvillanova\">@<span class=\"underline\">albertvillanova</span></a></span> </span></span> <span class=\"SVELTE_PARTIAL_HYDRATER contents\" data-target=\"UserMention\" data-props=\"{"user":"clefourrier"}\"><span class=\"inline-block\"><span class=\"contents\"><a href=\"/clefourrier\">@<span class=\"underline\">clefourrier</span></a></span> </span></span> Is there any way to resolve this issue or maybe set the instruction to set the output token limit to ensure it doesn't throw errors and works appropriately even with certain limitations?<br>PS. Working with limits is MUCH better than not working at all.</p>\n","updatedAt":"2025-02-05T17:52:54.912Z","author":{"_id":"66bdf5cee61ccd71d7a8e345","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png","fullname":"Kostiantyn Sytnyk","name":"Kumala3","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9417914152145386},"editors":["Kumala3"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/66bdf5cee61ccd71d7a8e345/K1oL6TOoPkTp89toKunK5.png"],"reactions":[{"reaction":"👍","users":["yahya024"],"count":1}],"isReport":false}},{"id":"67a3f39589e8d2a27530cf99","author":{"_id":"630427963926de1f7ec5ec28","avatarUrl":"/avatars/e3a9c0e424c98cede556f2678a97633a.svg","fullname":"Devin","name":"mrsmirf","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-05T23:26:13.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Can we get a readme with instructions","html":"<p>Can we get a readme with instructions</p>\n","updatedAt":"2025-02-05T23:26:13.513Z","author":{"_id":"630427963926de1f7ec5ec28","avatarUrl":"/avatars/e3a9c0e424c98cede556f2678a97633a.svg","fullname":"Devin","name":"mrsmirf","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8679396510124207},"editors":["mrsmirf"],"editorAvatarUrls":["/avatars/e3a9c0e424c98cede556f2678a97633a.svg"],"reactions":[{"reaction":"👍","users":["asdfasdf2","yahya024","JoscelinLIU"],"count":3}],"isReport":false}},{"id":"67a401f6b9d42055fc8fa55a","author":{"_id":"658376cf1e065c276dc1828f","avatarUrl":"/avatars/579918c727634c4bcabfb3fb1ba47bac.svg","fullname":"derek a","name":"derekalia","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-02-06T00:27:34.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I tried running this locally but got a couple of errors with the run.py command after installing the requirements. Maybe you guys should add a readme to get this setup. https://github.com/huggingface/smolagents/blob/gaia-submission-r1/examples/open_deep_research/run.py\n","html":"<p>I tried running this locally but got a couple of errors with the run.py command after installing the requirements. Maybe you guys should add a readme to get this setup. <a href=\"https://github.com/huggingface/smolagents/blob/gaia-submission-r1/examples/open_deep_research/run.py\" rel=\"nofollow\">https://github.com/huggingface/smolagents/blob/gaia-submission-r1/examples/open_deep_research/run.py</a></p>\n","updatedAt":"2025-02-06T00:27:34.994Z","author":{"_id":"658376cf1e065c276dc1828f","avatarUrl":"/avatars/579918c727634c4bcabfb3fb1ba47bac.svg","fullname":"derek a","name":"derekalia","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8555375337600708},"editors":["derekalia"],"editorAvatarUrls":["/avatars/579918c727634c4bcabfb3fb1ba47bac.svg"],"reactions":[],"isReport":false},"replies":[{"id":"67a409b98b76fa878bb630d4","author":{"_id":"630427963926de1f7ec5ec28","avatarUrl":"/avatars/e3a9c0e424c98cede556f2678a97633a.svg","fullname":"Devin","name":"mrsmirf","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-06T01:00:41.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Yeah I got errors too. Not sure if I need to install the entire repo, what to install, etc. But, I tried and have not gotten it to run.\n","html":"<p>Yeah I got errors too. Not sure if I need to install the entire repo, what to install, etc. But, I tried and have not gotten it to run.</p>\n","updatedAt":"2025-02-06T01:00:41.044Z","author":{"_id":"630427963926de1f7ec5ec28","avatarUrl":"/avatars/e3a9c0e424c98cede556f2678a97633a.svg","fullname":"Devin","name":"mrsmirf","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9595448970794678},"editors":["mrsmirf"],"editorAvatarUrls":["/avatars/e3a9c0e424c98cede556f2678a97633a.svg"],"reactions":[{"reaction":"👀","users":["derekalia","laslog","tianchi007"],"count":3}],"isReport":false,"parentCommentId":"67a401f6b9d42055fc8fa55a"}},{"id":"67a4ab1a5337c8871529037f","author":{"_id":"60bb997d85a3ab33829b6203","avatarUrl":"/avatars/90b793dba80854bdb44f4049d3ac940f.svg","fullname":"danny munn","name":"dunno","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-06T12:29:14.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"And me\n","html":"<p>And me</p>\n","updatedAt":"2025-02-06T12:29:14.046Z","author":{"_id":"60bb997d85a3ab33829b6203","avatarUrl":"/avatars/90b793dba80854bdb44f4049d3ac940f.svg","fullname":"danny munn","name":"dunno","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"ja","probability":0.13864575326442719},"editors":["dunno"],"editorAvatarUrls":["/avatars/90b793dba80854bdb44f4049d3ac940f.svg"],"reactions":[],"isReport":false,"parentCommentId":"67a401f6b9d42055fc8fa55a"}},{"id":"67a8379f90b658fa1f8d2f1f","author":{"_id":"613a226b0fd0cb3c9b9ede5a","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg","fullname":"Pulkit Mehta","name":"pulkitmehtawork","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":7,"isUserFollowing":false},"createdAt":"2025-02-09T05:05:35.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I was able to run run.py locally .. please check solution at https://github.com/huggingface/smolagents/issues/501.. i have mentioned steps there .","html":"<p>I was able to run run.py locally .. please check solution at <a href=\"https://github.com/huggingface/smolagents/issues/501\" rel=\"nofollow\">https://github.com/huggingface/smolagents/issues/501</a>.. i have mentioned steps there .</p>\n","updatedAt":"2025-02-09T05:05:35.238Z","author":{"_id":"613a226b0fd0cb3c9b9ede5a","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg","fullname":"Pulkit Mehta","name":"pulkitmehtawork","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":7,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9571865797042847},"editors":["pulkitmehtawork"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg"],"reactions":[],"isReport":false,"parentCommentId":"67a401f6b9d42055fc8fa55a"}}]},{"id":"67a4be08f54dc8112f257c49","author":{"_id":"6753091f3405c1120e5a73c7","avatarUrl":"/avatars/092b5c73000848c0979713e5230e539a.svg","fullname":"Dikeshwar","name":"Dikeshwar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-06T13:50:00.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"how to see future\n","html":"<p>how to see future</p>\n","updatedAt":"2025-02-06T13:50:00.215Z","author":{"_id":"6753091f3405c1120e5a73c7","avatarUrl":"/avatars/092b5c73000848c0979713e5230e539a.svg","fullname":"Dikeshwar","name":"Dikeshwar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9033801555633545},"editors":["Dikeshwar"],"editorAvatarUrls":["/avatars/092b5c73000848c0979713e5230e539a.svg"],"reactions":[],"isReport":false}},{"id":"67a4c883a76c40445fb6879c","author":{"_id":"673b11525d150a0c7eb1f663","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png","fullname":"Tom Green","name":"TGAI87","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-02-06T14:34:43.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Cursor is able to set this up nicely (and expand on it); just ensure you add the smolagents docs and direct it to the specific open deep research docs within the git repo under src. ","html":"<p>Cursor is able to set this up nicely (and expand on it); just ensure you add the smolagents docs and direct it to the specific open deep research docs within the git repo under src. </p>\n","updatedAt":"2025-02-06T14:34:43.718Z","author":{"_id":"673b11525d150a0c7eb1f663","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png","fullname":"Tom Green","name":"TGAI87","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.792789876461029},"editors":["TGAI87"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/RSee8xpDhqtG3W1iegjDL.png"],"reactions":[{"reaction":"👍","users":["DharmaDhukk","Agenciarc360"],"count":2}],"isReport":false},"replies":[{"id":"67a605c1bcaa4a3bc6375f10","author":{"_id":"6456c698c8f569b995dabf39","avatarUrl":"/avatars/a4350b71d2ae3e7fa0b912153d8d7aa1.svg","fullname":"Rodrigo Calé Lopes","name":"Agenciarc360","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-07T13:08:17.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"fale mais meu amigo.... ","html":"<p>fale mais meu amigo.... </p>\n","updatedAt":"2025-02-07T13:08:17.057Z","author":{"_id":"6456c698c8f569b995dabf39","avatarUrl":"/avatars/a4350b71d2ae3e7fa0b912153d8d7aa1.svg","fullname":"Rodrigo Calé Lopes","name":"Agenciarc360","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"pt","probability":0.9957731366157532},"editors":["Agenciarc360"],"editorAvatarUrls":["/avatars/a4350b71d2ae3e7fa0b912153d8d7aa1.svg"],"reactions":[],"isReport":false,"parentCommentId":"67a4c883a76c40445fb6879c"}}]},{"id":"67a4fbb88a71f1d63bf72d09","author":{"_id":"6318c33fc55c973b34d34ca3","avatarUrl":"/avatars/bfdcfe12e54f3e4148093c85886d1712.svg","fullname":"Carter LaSalle","name":"RocketNinja","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-06T18:13:12.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Hey guys! The demo is down :/","html":"<p>Hey guys! The demo is down :/</p>\n","updatedAt":"2025-02-06T18:13:12.151Z","author":{"_id":"6318c33fc55c973b34d34ca3","avatarUrl":"/avatars/bfdcfe12e54f3e4148093c85886d1712.svg","fullname":"Carter LaSalle","name":"RocketNinja","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8956465125083923},"editors":["RocketNinja"],"editorAvatarUrls":["/avatars/bfdcfe12e54f3e4148093c85886d1712.svg"],"reactions":[{"reaction":"👍","users":["RocketNinja","SuenoXIII","ymokhtar","georgekyr","rafagildin","pulkitmehtawork","aayc","horizon365","TaylorPzreal"],"count":9},{"reaction":"👀","users":["laslog"],"count":1},{"reaction":"🧠","users":["ak0601"],"count":1}],"isReport":false}},{"id":"67a60d0fa70fdb330af67719","author":{"_id":"67a5fa05c33e3ac8a953075d","avatarUrl":"/avatars/7aae48ce7097dcc3d44302c5adc5bd1b.svg","fullname":"tan ki","name":"Scrign29","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-07T13:39:27.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"impossible d’accéder à la démo.\n ","html":"<p>impossible d’accéder à la démo.\n </p>\n","updatedAt":"2025-02-07T13:39:27.915Z","author":{"_id":"67a5fa05c33e3ac8a953075d","avatarUrl":"/avatars/7aae48ce7097dcc3d44302c5adc5bd1b.svg","fullname":"tan ki","name":"Scrign29","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"fr","probability":0.9935305118560791},"editors":["Scrign29"],"editorAvatarUrls":["/avatars/7aae48ce7097dcc3d44302c5adc5bd1b.svg"],"reactions":[],"isReport":false}},{"id":"67a643f0f76404e1c1427422","author":{"_id":"64dc657a70446182be97d618","avatarUrl":"/avatars/00b6ff35ff724db0f2ef0d7f64968619.svg","fullname":"griged griged","name":"griged","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-07T17:33:36.000Z","type":"comment","data":{"edited":true,"hidden":false,"latest":{"raw":"I attempted a side by side comparison between your tool and the for pay Gemini Advanced 1.5 Pro with Deep Research for a particularly interesting and challenging task, but it is difficult to benchmark the results. Gemini did an overall poor - average job, but only after many manual additional prompts.\n\nInitial prompt:\n\"what are the highest judgements received by tenants for claims relating to either negligent or intentional infliction of emotional distress in the last 10 years, against landlords in Massachusetts?\"\nresult - it couldn't find anything\n I further revised the workflow with prompts such as\n\"Please note it may also be in landlord lawsuits against tenants, where tenants win in counter claim\"\n\n\"There may be some useful results there, but <instruction>. regenerate following my two stated criteria of \"in the last 10 years\" and \"In Massachusetts\" and afterwards <instruction> try to assess why your process missed this obvious mistake in its final output, and share with me your self analysis\"\n\n\"please consider a few ways that your filtering can be expanded while still satisfying my criteria. 1. There are various statutory frameworks within which \"negligent infliction of emotional distress\" or \"intentional infliction of emotional distress\" can be brought. It could be in the context of Chapter 93A consumer protection, it could be in the context of M.G.L. c. 186, §14 , in particular when in counter claim in an eviction matter. 2. Those landmark older cases can be very helpful if you search cases that cite them, in particular simon vs. solomon and Haddad v. Gonzalez. 3. It is more diffiult to find regular cases than binding case law, a few suggestions, certain trial courts like the Western Division of the Massachusetts Housing court publishes it's 'court reporter' which is basically a data dump of almost all of their case rulings. 3. You were wise to scrape masscases.com as it has unpublished as well as published decisions which are of interest to me, and they use a scrape friendly URL scheme. judyrecords.com, trellis.law, docketalarm all chose to allow being crawled by google for purposes of appearing in google search results. The information I seek can almost always be inferred purely from the information made available to google, for example {massachusetts emotional distress tenant site:trellis.law} without the {} braces returns many cases. Please try again\"\n\n\"Rader v Odermatt is an excellent example of a case matching my criteria. The tenant prevailed in counter claim, and was even awarded duplicative damages, normally discouraged and rare. Try to assess how you missed this case, output a revised list but also output your self analysis in your work flow\"\n\nI have omitted the self-analysis provided by Google, it was generally correct but as it recognized on its own, it failed to apply weights properly to my revisions. The other major hurdle of course is that for quazi-legal, sometimes technical, and due to outright politcal bias, most lower court, which in a way means \"real cases\", are very hard to find and even harder to scrape. I tried prompting with scraping strategies but in the end hardly any meaningful results were found. I had a certain results ready to assess its effectiveness. Unfortunetly your tool gave me the same error as stated by others upon just the first prompt","html":"<p>I attempted a side by side comparison between your tool and the for pay Gemini Advanced 1.5 Pro with Deep Research for a particularly interesting and challenging task, but it is difficult to benchmark the results. Gemini did an overall poor - average job, but only after many manual additional prompts.</p>\n<p>Initial prompt:<br>\"what are the highest judgements received by tenants for claims relating to either negligent or intentional infliction of emotional distress in the last 10 years, against landlords in Massachusetts?\"<br>result - it couldn't find anything<br> I further revised the workflow with prompts such as<br>\"Please note it may also be in landlord lawsuits against tenants, where tenants win in counter claim\"</p>\n<p>\"There may be some useful results there, but . regenerate following my two stated criteria of \"in the last 10 years\" and \"In Massachusetts\" and afterwards try to assess why your process missed this obvious mistake in its final output, and share with me your self analysis\"</p>\n<p>\"please consider a few ways that your filtering can be expanded while still satisfying my criteria. 1. There are various statutory frameworks within which \"negligent infliction of emotional distress\" or \"intentional infliction of emotional distress\" can be brought. It could be in the context of Chapter 93A consumer protection, it could be in the context of M.G.L. c. 186, §14 , in particular when in counter claim in an eviction matter. 2. Those landmark older cases can be very helpful if you search cases that cite them, in particular simon vs. solomon and Haddad v. Gonzalez. 3. It is more diffiult to find regular cases than binding case law, a few suggestions, certain trial courts like the Western Division of the Massachusetts Housing court publishes it's 'court reporter' which is basically a data dump of almost all of their case rulings. 3. You were wise to scrape masscases.com as it has unpublished as well as published decisions which are of interest to me, and they use a scrape friendly URL scheme. judyrecords.com, trellis.law, docketalarm all chose to allow being crawled by google for purposes of appearing in google search results. The information I seek can almost always be inferred purely from the information made available to google, for example {massachusetts emotional distress tenant site:trellis.law} without the {} braces returns many cases. Please try again\"</p>\n<p>\"Rader v Odermatt is an excellent example of a case matching my criteria. The tenant prevailed in counter claim, and was even awarded duplicative damages, normally discouraged and rare. Try to assess how you missed this case, output a revised list but also output your self analysis in your work flow\"</p>\n<p>I have omitted the self-analysis provided by Google, it was generally correct but as it recognized on its own, it failed to apply weights properly to my revisions. The other major hurdle of course is that for quazi-legal, sometimes technical, and due to outright politcal bias, most lower court, which in a way means \"real cases\", are very hard to find and even harder to scrape. I tried prompting with scraping strategies but in the end hardly any meaningful results were found. I had a certain results ready to assess its effectiveness. Unfortunetly your tool gave me the same error as stated by others upon just the first prompt</p>\n","updatedAt":"2025-02-07T17:35:00.798Z","author":{"_id":"64dc657a70446182be97d618","avatarUrl":"/avatars/00b6ff35ff724db0f2ef0d7f64968619.svg","fullname":"griged griged","name":"griged","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":1,"identifiedLanguage":{"language":"en","probability":0.9586406946182251},"editors":["griged"],"editorAvatarUrls":["/avatars/00b6ff35ff724db0f2ef0d7f64968619.svg"],"reactions":[],"isReport":false}},{"id":"67a645d55fab975ae1ff5558","author":{"_id":"63d10d4e8eaa4831005e92b5","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/63d10d4e8eaa4831005e92b5/7p7-OmWM6PqqCs7ZStPGD.jpeg","fullname":"Aymeric Roucher","name":"m-ric","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1943,"isUserFollowing":false},"createdAt":"2025-02-07T17:41:41.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"The demo's up again!","html":"<p>The demo's up again!</p>\n","updatedAt":"2025-02-07T17:41:41.658Z","author":{"_id":"63d10d4e8eaa4831005e92b5","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/63d10d4e8eaa4831005e92b5/7p7-OmWM6PqqCs7ZStPGD.jpeg","fullname":"Aymeric Roucher","name":"m-ric","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1943,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.7949540019035339},"editors":["m-ric"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/63d10d4e8eaa4831005e92b5/7p7-OmWM6PqqCs7ZStPGD.jpeg"],"reactions":[{"reaction":"❤️","users":["griged","clefourrier","songym","danschmidt88"],"count":4}],"isReport":false},"replies":[{"id":"67a670624a2a4818e2433492","author":{"_id":"67a66fcc0ea8e447058313f4","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/60sZmud20CDwuQ5dEo0Zr.png","fullname":"K W","name":"karelwar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-07T20:43:14.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Not for a long time :(\n\n![Screenshot_20250207_213738_Brave.jpg](https://cdn-uploads.huggingface.co/production/uploads/67a66fcc0ea8e447058313f4/TZ9_s5GYB9WBC3npXgWPV.jpeg)\n","html":"<p>Not for a long time :(</p>\n<p><a href=\"https://cdn-uploads.huggingface.co/production/uploads/67a66fcc0ea8e447058313f4/TZ9_s5GYB9WBC3npXgWPV.jpeg\" rel=\"nofollow\"><img src=\"https://cdn-uploads.huggingface.co/production/uploads/67a66fcc0ea8e447058313f4/TZ9_s5GYB9WBC3npXgWPV.jpeg\" alt=\"Screenshot_20250207_213738_Brave.jpg\"></a></p>\n","updatedAt":"2025-02-07T20:43:14.332Z","author":{"_id":"67a66fcc0ea8e447058313f4","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/60sZmud20CDwuQ5dEo0Zr.png","fullname":"K W","name":"karelwar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.3620457947254181},"editors":["karelwar"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/60sZmud20CDwuQ5dEo0Zr.png"],"reactions":[],"isReport":false,"parentCommentId":"67a645d55fab975ae1ff5558"}}]},{"id":"67a836ffdd9e3a891b1744e2","author":{"_id":"613a226b0fd0cb3c9b9ede5a","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg","fullname":"Pulkit Mehta","name":"pulkitmehtawork","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":7,"isUserFollowing":false},"createdAt":"2025-02-09T05:02:55.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I was able to run run.py locally .. please check solution at https://github.com/huggingface/smolagents/issues/501.. i have mentioned steps there . \n\n","html":"<p>I was able to run run.py locally .. please check solution at <a href=\"https://github.com/huggingface/smolagents/issues/501\" rel=\"nofollow\">https://github.com/huggingface/smolagents/issues/501</a>.. i have mentioned steps there . </p>\n","updatedAt":"2025-02-09T05:02:55.937Z","author":{"_id":"613a226b0fd0cb3c9b9ede5a","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg","fullname":"Pulkit Mehta","name":"pulkitmehtawork","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":7,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9571865797042847},"editors":["pulkitmehtawork"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/613a226b0fd0cb3c9b9ede5a/Dhi8bmqnAiG6s1rqNxJjM.jpeg"],"reactions":[],"isReport":false}},{"id":"67a8d070dc24acd26bd2ab25","author":{"_id":"67a32af308a845205e4a7271","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/79XjKRAAk9hIhNw2_NLzZ.jpeg","fullname":"Gbenga Ogunbule","name":"onedayatime","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-09T15:57:36.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I read everything from A-Z. Thanks for this","html":"<p>I read everything from A-Z. Thanks for this</p>\n","updatedAt":"2025-02-09T15:57:36.843Z","author":{"_id":"67a32af308a845205e4a7271","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/79XjKRAAk9hIhNw2_NLzZ.jpeg","fullname":"Gbenga Ogunbule","name":"onedayatime","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9338797330856323},"editors":["onedayatime"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/79XjKRAAk9hIhNw2_NLzZ.jpeg"],"reactions":[],"isReport":false}},{"id":"67aaf4bf6dcb0f0653a3f8bd","author":{"_id":"67386bb9826f56603a14ec38","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/EHXCPnmWSCpLO4US8aKwv.png","fullname":"serkan akbulut","name":"serkan90","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-11T06:57:03.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"buffer ","html":"<p>buffer </p>\n","updatedAt":"2025-02-11T06:57:03.975Z","author":{"_id":"67386bb9826f56603a14ec38","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/EHXCPnmWSCpLO4US8aKwv.png","fullname":"serkan akbulut","name":"serkan90","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.6399106383323669},"editors":["serkan90"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/EHXCPnmWSCpLO4US8aKwv.png"],"reactions":[],"isReport":false}},{"id":"67adcfdee9800323e42ded25","author":{"_id":"6432e4934521083b9d27c3a3","avatarUrl":"/avatars/a0e4dd687f28451e6e04004e64b4b300.svg","fullname":"Attila Vass","name":"inbuss","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-13T10:56:30.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"I'd love to read a good README.md of this open_deep_research folder, how to use and tweak that example :)","html":"<p>I'd love to read a good README.md of this open_deep_research folder, how to use and tweak that example :)</p>\n","updatedAt":"2025-02-13T10:56:30.928Z","author":{"_id":"6432e4934521083b9d27c3a3","avatarUrl":"/avatars/a0e4dd687f28451e6e04004e64b4b300.svg","fullname":"Attila Vass","name":"inbuss","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9040752053260803},"editors":["inbuss"],"editorAvatarUrls":["/avatars/a0e4dd687f28451e6e04004e64b4b300.svg"],"reactions":[{"reaction":"👀","users":["Permahuman"],"count":1}],"isReport":false}},{"id":"67b196fc248b7168802a033f","author":{"_id":"667ae4ae8a3c33a93617309b","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png","fullname":"osman kadir","name":"CodePhyt","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":8,"isUserFollowing":false},"createdAt":"2025-02-16T07:42:52.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"amazing\n","html":"<p>amazing</p>\n","updatedAt":"2025-02-16T07:42:52.097Z","author":{"_id":"667ae4ae8a3c33a93617309b","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png","fullname":"osman kadir","name":"CodePhyt","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":8,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.6036972403526306},"editors":["CodePhyt"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png"],"reactions":[],"isReport":false}},{"id":"67b3bc7e72929d68e8b1553a","author":{"_id":"63ca214abedad7e2bf1d1517","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1674191139776-noauth.png","fullname":"Xuan-Son Nguyen","name":"ngxson","type":"user","isPro":false,"isHf":true,"isHfAdmin":false,"isMod":false,"followerCount":614,"isUserFollowing":false},"createdAt":"2025-02-17T22:47:26.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"📻 🎙️ Hey, I made a podcast about this blog post, check it out!\n\n<audio controls src=\"https://huggingface.co/ngxson/hf-blog-podcast/resolve/main/open-deep-research.mp3\"></audio>\n\n*This podcast is generated via [ngxson/kokoro-podcast-generator](https://huggingface.co/spaces/ngxson/kokoro-podcast-generator), using DeepSeek-R1 and Kokoro-TTS*","html":"<p>📻 🎙️ Hey, I made a podcast about this blog post, check it out!</p>\n<p><audio controls=\"\" src=\"https://huggingface.co/ngxson/hf-blog-podcast/resolve/main/open-deep-research.mp3\"></audio></p>\n<p><em>This podcast is generated via <a href=\"https://huggingface.co/spaces/ngxson/kokoro-podcast-generator\">ngxson/kokoro-podcast-generator</a>, using DeepSeek-R1 and Kokoro-TTS</em></p>\n","updatedAt":"2025-02-17T22:47:26.310Z","author":{"_id":"63ca214abedad7e2bf1d1517","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1674191139776-noauth.png","fullname":"Xuan-Son Nguyen","name":"ngxson","type":"user","isPro":false,"isHf":true,"isHfAdmin":false,"isMod":false,"followerCount":614,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.7533355355262756},"editors":["ngxson"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/1674191139776-noauth.png"],"reactions":[{"reaction":"👍","users":["shtefcs"],"count":1}],"isReport":false},"replies":[{"id":"67b3c4e81bfe04e82825160e","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false},"createdAt":"2025-02-17T23:23:20.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"This is cool. ","html":"<p>This is cool. </p>\n","updatedAt":"2025-02-17T23:23:20.942Z","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9945847392082214},"editors":["shtefcs"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png"],"reactions":[],"isReport":false,"parentCommentId":"67b3bc7e72929d68e8b1553a"}}]},{"id":"67b6ed6fea22340afaa92277","author":{"_id":"6263e61bc26f7844278ddee2","avatarUrl":"/avatars/b5de4e6d5f4b4c444820781028bbde05.svg","fullname":"Levy","name":"Tamar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-20T08:53:03.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Hey Great blog post! I noticed you published the models tested for the Gaia/Math benchmarking—thanks for sharing that.\n\nI was wondering if you could let me know which server you used to run the models? I’m currently using vLLM, but it seems like it doesn’t yet support tool_choice=\"required\". To make it work, I had to tweak the model code to force it to return a tool for execution.\n\nThanks in advance for any insights!","html":"<p>Hey Great blog post! I noticed you published the models tested for the Gaia/Math benchmarking—thanks for sharing that.</p>\n<p>I was wondering if you could let me know which server you used to run the models? I’m currently using vLLM, but it seems like it doesn’t yet support tool_choice=\"required\". To make it work, I had to tweak the model code to force it to return a tool for execution.</p>\n<p>Thanks in advance for any insights!</p>\n","updatedAt":"2025-02-20T08:53:03.057Z","author":{"_id":"6263e61bc26f7844278ddee2","avatarUrl":"/avatars/b5de4e6d5f4b4c444820781028bbde05.svg","fullname":"Levy","name":"Tamar","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.956964910030365},"editors":["Tamar"],"editorAvatarUrls":["/avatars/b5de4e6d5f4b4c444820781028bbde05.svg"],"reactions":[],"isReport":false}},{"id":"67bb69243526697ceaa8043b","author":{"_id":"660c3c5c8eec126bfc7aa326","avatarUrl":"/avatars/6d9241481e99acd18df313542f816af7.svg","fullname":"Prabhu","name":"prabhu130986","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-02-23T18:29:56.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"i've tried to run the agent in my local setup and i would say, its pretty impressive. i tried the same questions from Openai's deep research page (https://openai.com/index/introducing-deep-research/), just to compare the workflow and output. \n\nThe plan of action it created was neat and executed all the workflow steps one by one, though there were some errors in between, but that didnt break the progress. Finally it gave the final recommendation based on all the gathered data. \n\nAttached is the result of using gpt-4o model. using o1 model will definitely give a better inference.\n![plan.jpg](https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/MvwT9enRT7gOESHA_tpRj.jpeg)\n![final-answer.jpg](https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/JNs_DrpFbr6ok_pSRUK4j.jpeg)\n\n","html":"<p>i've tried to run the agent in my local setup and i would say, its pretty impressive. i tried the same questions from Openai's deep research page (<a href=\"https://openai.com/index/introducing-deep-research/\" rel=\"nofollow\">https://openai.com/index/introducing-deep-research/</a>), just to compare the workflow and output. </p>\n<p>The plan of action it created was neat and executed all the workflow steps one by one, though there were some errors in between, but that didnt break the progress. Finally it gave the final recommendation based on all the gathered data. </p>\n<p>Attached is the result of using gpt-4o model. using o1 model will definitely give a better inference.<br><a href=\"https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/MvwT9enRT7gOESHA_tpRj.jpeg\" rel=\"nofollow\"><img src=\"https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/MvwT9enRT7gOESHA_tpRj.jpeg\" alt=\"plan.jpg\"></a><br><a href=\"https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/JNs_DrpFbr6ok_pSRUK4j.jpeg\" rel=\"nofollow\"><img src=\"https://cdn-uploads.huggingface.co/production/uploads/660c3c5c8eec126bfc7aa326/JNs_DrpFbr6ok_pSRUK4j.jpeg\" alt=\"final-answer.jpg\"></a></p>\n","updatedAt":"2025-02-23T18:29:56.705Z","author":{"_id":"660c3c5c8eec126bfc7aa326","avatarUrl":"/avatars/6d9241481e99acd18df313542f816af7.svg","fullname":"Prabhu","name":"prabhu130986","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9125522375106812},"editors":["prabhu130986"],"editorAvatarUrls":["/avatars/6d9241481e99acd18df313542f816af7.svg"],"reactions":[{"reaction":"🔥","users":["m-ric"],"count":1}],"isReport":false}},{"id":"67bfea101e5abff2a2542ecd","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-02-27T04:29:04.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Can we add something that searches arxiv and pubmed articles and then presents the research. I think it would be a great start","html":"<p>Can we add something that searches arxiv and pubmed articles and then presents the research. I think it would be a great start</p>\n","updatedAt":"2025-02-27T04:29:04.593Z","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9331451654434204},"editors":["vinayp27"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg"],"reactions":[{"reaction":"👍","users":["rdittrich","Shivraj07"],"count":2}],"isReport":false},"replies":[{"id":"67c8898b2019d3f5623159ba","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false},"createdAt":"2025-03-05T17:27:39.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Like a scraper that will gather data from resesrch articles and feed into DeepSeek? ","html":"<p>Like a scraper that will gather data from resesrch articles and feed into DeepSeek? </p>\n","updatedAt":"2025-03-05T17:27:39.571Z","author":{"_id":"6708d10f793a1fcd6c7633fb","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png","fullname":"Stefan Smiljkovic","name":"shtefcs","type":"user","isPro":true,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":129,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8939743638038635},"editors":["shtefcs"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/TwR65k1JgO_t3l4pM1UjA.png"],"reactions":[],"isReport":false,"parentCommentId":"67bfea101e5abff2a2542ecd"}},{"id":"67c88a299c8509e4cca73537","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-03-05T17:30:17.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Yes, arxiv already has its api which can download articles and it should not be too hard. I can create a simple PR for it if anyone wants it","html":"<p>Yes, arxiv already has its api which can download articles and it should not be too hard. I can create a simple PR for it if anyone wants it</p>\n","updatedAt":"2025-03-05T17:30:17.197Z","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.965246856212616},"editors":["vinayp27"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg"],"reactions":[],"isReport":false,"parentCommentId":"67bfea101e5abff2a2542ecd"}},{"id":"67d3b81ffa849c53a75300ed","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false},"createdAt":"2025-03-14T05:01:19.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"So I was able to get papers from arxiv using the tools. For now it only gets the summary and abstract from the papers and create a report. I was wondering if we can add something like a spacy tokenizer to get entities and search it in the arxiv that way we can get way more results","html":"<p>So I was able to get papers from arxiv using the tools. For now it only gets the summary and abstract from the papers and create a report. I was wondering if we can add something like a spacy tokenizer to get entities and search it in the arxiv that way we can get way more results</p>\n","updatedAt":"2025-03-14T05:01:19.911Z","author":{"_id":"66cbe9043fa97c9db69dc327","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg","fullname":"Vinay Pandya","name":"vinayp27","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":1,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9334847331047058},"editors":["vinayp27"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/4mVd3pDqqYFnqZEojwMaS.jpeg"],"reactions":[],"isReport":false,"parentCommentId":"67bfea101e5abff2a2542ecd"}}]},{"id":"67c8233fdf15f5978ad8c9ab","author":{"_id":"673704fe7c90d4baa48e5419","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/tgnHkD7mdOOu1dKvAdo2k.png","fullname":"To Huy","name":"huytofu92","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-03-05T10:11:11.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Another bullet fired at closedAI it seems :))","html":"<p>Another bullet fired at closedAI it seems :))</p>\n","updatedAt":"2025-03-05T10:11:11.221Z","author":{"_id":"673704fe7c90d4baa48e5419","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/tgnHkD7mdOOu1dKvAdo2k.png","fullname":"To Huy","name":"huytofu92","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.9773854613304138},"editors":["huytofu92"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/tgnHkD7mdOOu1dKvAdo2k.png"],"reactions":[{"reaction":"👍","users":["shtefcs"],"count":1}],"isReport":false}},{"id":"67c9b35514169adb8eb218b9","createdAt":"2025-03-06T14:38:13.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"yes","html":"<p>yes</p>\n","updatedAt":"2025-03-06T14:38:13.113Z"},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.18715982139110565},"editors":["deleted"],"editorAvatarUrls":["deleted"],"reactions":[],"isReport":false}},{"id":"67cac6e4d6a6605f9c448c18","author":{"_id":"67c41f9599e110b3d193c4af","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/WlzzwUYRRokYYsyyiqoGK.png","fullname":"Mozamil Ahmadzaei","name":"Moza05","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-03-07T10:13:56.000Z","type":"comment","data":{"edited":true,"hidden":true,"hiddenBy":"","latest":{"raw":"This comment has been hidden","html":"This comment has been hidden","updatedAt":"2025-03-07T10:14:34.950Z","author":{"_id":"67c41f9599e110b3d193c4af","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/noauth/WlzzwUYRRokYYsyyiqoGK.png","fullname":"Mozamil Ahmadzaei","name":"Moza05","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"editors":[],"editorAvatarUrls":[],"reactions":[]}},{"id":"67ce9b73c6cda1c500304e52","author":{"_id":"60c8f437d3f493296bae29f9","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1623782442046-noauth.png","fullname":"Alberto Carmona Barthelemy","name":"milyiyo","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":15,"isUserFollowing":false},"createdAt":"2025-03-10T07:57:39.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"The demo is not working :(\n\nhttps://m-ric-open-deep-research.hf.space/","html":"<p>The demo is not working :(</p>\n<p><a href=\"https://m-ric-open-deep-research.hf.space/\" rel=\"nofollow\">https://m-ric-open-deep-research.hf.space/</a></p>\n","updatedAt":"2025-03-10T07:57:39.790Z","author":{"_id":"60c8f437d3f493296bae29f9","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/1623782442046-noauth.png","fullname":"Alberto Carmona Barthelemy","name":"milyiyo","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":15,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.849936842918396},"editors":["milyiyo"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/1623782442046-noauth.png"],"reactions":[],"isReport":false}},{"id":"67dc0b30c6c20c5dc796f616","author":{"_id":"667ae4ae8a3c33a93617309b","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png","fullname":"osman kadir","name":"CodePhyt","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":8,"isUserFollowing":false},"createdAt":"2025-03-20T12:33:52.000Z","type":"comment","data":{"edited":true,"hidden":false,"latest":{"raw":"i will find a way to make every tech out there opensource and bring opensource humaniy into this world \n","html":"<p>i will find a way to make every tech out there opensource and bring opensource humaniy into this world </p>\n","updatedAt":"2025-03-20T12:34:23.095Z","author":{"_id":"667ae4ae8a3c33a93617309b","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png","fullname":"osman kadir","name":"CodePhyt","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":8,"isUserFollowing":false}},"numEdits":1,"identifiedLanguage":{"language":"en","probability":0.8993314504623413},"editors":["CodePhyt"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/667ae4ae8a3c33a93617309b/Z6uAlG5J7FCp2lk4ndklw.png"],"reactions":[{"reaction":"🤗","users":["Agenciarc360"],"count":1}],"isReport":false}},{"id":"67e3aa23206cffe371ff32ae","author":{"_id":"67aee02855881a0496d3b161","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/B0jkbiGJVHw6xXLsER4Yv.png","fullname":"Rui","name":"OMAP3530","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-03-26T07:17:55.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"@m-ric Hi, I am trying to leverage the `VisitTool` that is based on `SimpleTextBrowser` to fetch page content from URL. But I find it may returns `error 403 Enable JavaScript and cookies to continue` for some URLs like https://www.businessresearchinsights.com/market-reports/software-resellers-market-117159. So I am wondering how does Open DR handle such issues when generating final report or doing the analysis. just skip it or any other to fetch content snippet from the page via `GoogleSearchTool`?","html":"<p><span class=\"SVELTE_PARTIAL_HYDRATER contents\" data-target=\"UserMention\" data-props=\"{"user":"m-ric"}\"><span class=\"inline-block\"><span class=\"contents\"><a href=\"/m-ric\">@<span class=\"underline\">m-ric</span></a></span> </span></span> Hi, I am trying to leverage the <code>VisitTool</code> that is based on <code>SimpleTextBrowser</code> to fetch page content from URL. But I find it may returns <code>error 403 Enable JavaScript and cookies to continue</code> for some URLs like <a href=\"https://www.businessresearchinsights.com/market-reports/software-resellers-market-117159\" rel=\"nofollow\">https://www.businessresearchinsights.com/market-reports/software-resellers-market-117159</a>. So I am wondering how does Open DR handle such issues when generating final report or doing the analysis. just skip it or any other to fetch content snippet from the page via <code>GoogleSearchTool</code>?</p>\n","updatedAt":"2025-03-26T07:17:55.881Z","author":{"_id":"67aee02855881a0496d3b161","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/B0jkbiGJVHw6xXLsER4Yv.png","fullname":"Rui","name":"OMAP3530","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8113055229187012},"editors":["OMAP3530"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/no-auth/B0jkbiGJVHw6xXLsER4Yv.png"],"reactions":[],"isReport":false}},{"id":"68f7878cb4dd1e5b1d03a07d","author":{"_id":"680a418570e6b6cd546be8b0","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/680a418570e6b6cd546be8b0/WV2vcoSOhh5Hv6zPCCak5.jpeg","fullname":"elenamarziali","name":"elly99","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":3,"isUserFollowing":false},"createdAt":"2025-10-21T13:15:56.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"Can autonomous agents learn to reflect on their own epistemic trajectory? \nInspired by the need for cognitive scaffolding, I’ve built MarCognity-AI \nhttps://huggingface.co/elly99/MarCognity-AI\n— a metacognitive framework that encodes reasoning before response. \nIt doesn’t just optimize for retrieval. It encodes conceptual regret, ethical thresholds, and the discomfort of premature synthesis. \nCould we imagine agents that track the cognitive cost of each query? \nThat learn not just from relevance — but from reflection? I’d love to explore how this scaffolding could reshape autonomous research — not with answers, but with architecture.","html":"<p>Can autonomous agents learn to reflect on their own epistemic trajectory?<br>Inspired by the need for cognitive scaffolding, I’ve built MarCognity-AI<br><a href=\"https://huggingface.co/elly99/MarCognity-AI\">https://huggingface.co/elly99/MarCognity-AI</a><br>— a metacognitive framework that encodes reasoning before response.<br>It doesn’t just optimize for retrieval. It encodes conceptual regret, ethical thresholds, and the discomfort of premature synthesis.<br>Could we imagine agents that track the cognitive cost of each query?<br>That learn not just from relevance — but from reflection? I’d love to explore how this scaffolding could reshape autonomous research — not with answers, but with architecture.</p>\n","updatedAt":"2025-10-21T13:15:56.777Z","author":{"_id":"680a418570e6b6cd546be8b0","avatarUrl":"https://cdn-avatars.huggingface.co/v1/production/uploads/680a418570e6b6cd546be8b0/WV2vcoSOhh5Hv6zPCCak5.jpeg","fullname":"elenamarziali","name":"elly99","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"followerCount":3,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8945235013961792},"editors":["elly99"],"editorAvatarUrls":["https://cdn-avatars.huggingface.co/v1/production/uploads/680a418570e6b6cd546be8b0/WV2vcoSOhh5Hv6zPCCak5.jpeg"],"reactions":[],"isReport":false}},{"id":"69365e5a1053d0c0834c3f98","author":{"_id":"6932862502baca9ccdd4665d","avatarUrl":"/avatars/ca176894b2f946a3f371252248224246.svg","fullname":"Roman Gardner","name":"Roman1902","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false},"createdAt":"2025-12-08T05:12:58.000Z","type":"comment","data":{"edited":false,"hidden":false,"latest":{"raw":"\"What a fascinating read! It’s impressive how Hugging Face’s “Open Deep Research” project brings open-source spirit to cutting-edge research agents — by combining large language models with an “agentic framework” that can autonomously browse the web, gather info, and synthesize structured answers. I appreciate how you walk through the rationale behind agent frameworks, discuss the performance metrics (like the jump in the GAIA benchmark), and outline both the current results and the path forward for community contribution. \n\nI also recently read a related article: https://mobisoftinfotech.com/resources/blog/ai-development/llm-api-pricing-guide \n — that post gives a clear breakdown of how usage patterns, token counts, and model choices affect LLM API costs in practical deployments.\n\nSeeing Open Deep Research as an open-source, transparent alternative alongside a guide that helps with realistic cost estimation gives a really balanced view: you show how to build powerful AI tools and how to plan for their usage sustainably.\"","html":"<p>\"What a fascinating read! It’s impressive how Hugging Face’s “Open Deep Research” project brings open-source spirit to cutting-edge research agents — by combining large language models with an “agentic framework” that can autonomously browse the web, gather info, and synthesize structured answers. I appreciate how you walk through the rationale behind agent frameworks, discuss the performance metrics (like the jump in the GAIA benchmark), and outline both the current results and the path forward for community contribution. </p>\n<p>I also recently read a related article: <a href=\"https://mobisoftinfotech.com/resources/blog/ai-development/llm-api-pricing-guide\" rel=\"nofollow\">https://mobisoftinfotech.com/resources/blog/ai-development/llm-api-pricing-guide</a><br> — that post gives a clear breakdown of how usage patterns, token counts, and model choices affect LLM API costs in practical deployments.</p>\n<p>Seeing Open Deep Research as an open-source, transparent alternative alongside a guide that helps with realistic cost estimation gives a really balanced view: you show how to build powerful AI tools and how to plan for their usage sustainably.\"</p>\n","updatedAt":"2025-12-08T05:12:58.870Z","author":{"_id":"6932862502baca9ccdd4665d","avatarUrl":"/avatars/ca176894b2f946a3f371252248224246.svg","fullname":"Roman Gardner","name":"Roman1902","type":"user","isPro":false,"isHf":false,"isHfAdmin":false,"isMod":false,"isUserFollowing":false}},"numEdits":0,"identifiedLanguage":{"language":"en","probability":0.8933740854263306},"editors":["Roman1902"],"editorAvatarUrls":["/avatars/ca176894b2f946a3f371252248224246.svg"],"reactions":[],"isReport":false}}],"status":"open","isReport":false,"pinned":false,"locked":false,"collection":"community_blogs"},"contextAuthors":["m-ric","albertvillanova","merve","thomwolf","clefourrier"],"primaryEmailConfirmed":false,"discussionRole":0,"acceptLanguages":["*"],"withThread":true,"cardDisplay":false,"repoDiscussionsLocked":false}"> 
+
+sfield 
+Feb 4, 2025 
+
+DeepSeek's reasoning skills are probably particularly useful for something like this. But in my mind, particularly for academic research type tasks, the propaganda baked into the model is a non-starter. I tested out the new DeepSeek-R1-Distill-Llama-70B-Uncensored-v2-Unbiased model yesterday. It was a very crude test, but I was quite impressed. I'm a newb over here, so take this as a light suggestion, just in case its helpful, nothing more.
+
+See translation 
+
+- 
+
+- 
+
+- 
+
+- 3 replies 
+· 👍
+4
+4
+
++ 
+
+TGAI87 
+Feb 5, 2025 
+
+Yep I'm very impressed with it too. Follows direction exceptionally well, and corrects (intentional) mistakes. Going to try to get it working nicely on my RTX 4090 with offloading. 
+
+See translation 
+
+Expand 2
+replies 
+
+ElanInPhilly 
+Feb 5, 2025 
+
+This sounds pretty interesting, so I up voted based on description. However, the demo implementation definitely needs attention and work. Now, on several occasions, after long waits in 100+ user queues, I repeatedly get "Error in generating model output: litellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': "This model's maximum context length is 128000 tokens. However, your messages resulted in 419624 tokens. Please reduce the length of the messages.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}". So this seems pretty basic, *. * the demo definitely to be crafted so the model can handle the correct token limits at the right time and place. Absent that ....
+
+See translation 
+👍
+7
+7
+
++ 
+
+Reply 
+
+jonwondo 
+Feb 5, 2025 
+
+I'm getting the same errors as the person above on the demo site. Must be a bug as I tried different prompts and had to wait ~1hr for each one due to the queue: Error in generating model output: litellm.ContextWindowExceededError: litellm.BadRequestError: ContextWindowExceededError: OpenAIException - Error code: 400 - {'error': {'message': "This model's maximum context length is 128000 tokens. However, your messages resulted in 709582 tokens. Please reduce the length of the messages.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+
+See translation 
+👍
+6
+6
+
++ 
+
+Reply 
+
+raidhon 
+Feb 5, 2025 
+
+Very cool thanks! I think OpenAI already hate Open Source :))))) Products that are trying so hard to monetize are created in one day.
+
+See translation 
+👍
+4
+4
+
++ 
+
+Reply 
+
+shtefcs 
+Feb 5, 2025 •
+edited Feb 5, 2025 
+
+This is a big step toward more capable AI agents. At Automatio.ai , we're working on integrating similar autonomous web agents to streamline data extraction and web automation, letting users build powerful scrapers without coding. The challenge is making sure these agents can navigate complex websites reliably. How do you see open-source AI helping bridge the gap between research prototypes and real-world automation?
+
+See translation 
+👍
+1
+1
+
++ 
+
+Reply 
+
+MS100 
+Feb 5, 2025 
+
+Amazing. I am so interested in participating.
+
+See translation 
+
+Reply 
+
+Kumala3 
+Feb 5, 2025 
+
+I am currently exploring Open-Source alternatives to OpenAI DeepResearch as it's a really great product, one of the most useful since ChatGPT was launched in 2022 for me, as the results of research are incredible high-quality not just simple research with "search" function. I've decided to try out this Open Deep Research via Hugging face space and ran into issue with the returned output exceeded 128K token limit: 
+
+See translation 
+👍
+1
+1
+
++ 
+
+Reply 
+
+Kumala3 
+Feb 5, 2025 
+
+@ albertvillanova @ clefourrier Is there any way to resolve this issue or maybe set the instruction to set the output token limit to ensure it doesn't throw errors and works appropriately even with certain limitations? PS. Working with limits is MUCH better than not working at all.
+
+See translation 
+👍
+1
+1
+
++ 
+
+Reply 
+
+mrsmirf 
+Feb 5, 2025 
+
+Can we get a readme with instructions
+
+See translation 
+👍
+3
+3
+
++ 
+
+Reply 
+
+derekalia 
+Feb 6, 2025 
+
+I tried running this locally but got a couple of errors with the run.py command after installing the requirements. Maybe you guys should add a readme to get this setup. https://github.com/huggingface/smolagents/blob/gaia-submission-r1/examples/open_deep_research/run.py 
+
+See translation 
+
+- 
+
+- 
+
+- 
+
+- 3 replies 
+· 
+
+mrsmirf 
+Feb 6, 2025 
+
+Yeah I got errors too. Not sure if I need to install the entire repo, what to install, etc. But, I tried and have not gotten it to run.
+
+See translation 
+👀
+3
+3
+
++ 
+
+Expand 2
+replies 
+
+Dikeshwar 
+Feb 6, 2025 
+
+how to see future
+
+Reply 
+
+TGAI87 
+Feb 6, 2025 
+
+Cursor is able to set this up nicely (and expand on it); just ensure you add the smolagents docs and direct it to the specific open deep research docs within the git repo under src. 
+
+See translation 
+
+- 
+
+- 1 reply 
+· 👍
+2
+2
+
++ 
+
+Agenciarc360 
+Feb 7, 2025 
+
+fale mais meu amigo.... 
+
+See translation 
+
+RocketNinja 
+Feb 6, 2025 
+
+Hey guys! The demo is down :/
+
+See translation 
+👍
+9
+9
+
+👀
+1
+1
+
+🧠
+1
+1
+
++ 
+
+Reply 
+
+Scrign29 
+Feb 7, 2025 
+
+impossible d’accéder à la démo.
+
+See translation 
+
+Reply 
+
+griged 
+Feb 7, 2025 •
+edited Feb 7, 2025 
+
+I attempted a side by side comparison between your tool and the for pay Gemini Advanced 1.5 Pro with Deep Research for a particularly interesting and challenging task, but it is difficult to benchmark the results. Gemini did an overall poor - average job, but only after many manual additional prompts.
+
+Initial prompt: "what are the highest judgements received by tenants for claims relating to either negligent or intentional infliction of emotional distress in the last 10 years, against landlords in Massachusetts?" result - it couldn't find anything I further revised the workflow with prompts such as "Please note it may also be in landlord lawsuits against tenants, where tenants win in counter claim"
+
+"There may be some useful results there, but . regenerate following my two stated criteria of "in the last 10 years" and "In Massachusetts" and afterwards try to assess why your process missed this obvious mistake in its final output, and share with me your self analysis"
+
+"please consider a few ways that your filtering can be expanded while still satisfying my criteria. 1. There are various statutory frameworks within which "negligent infliction of emotional distress" or "intentional infliction of emotional distress" can be brought. It could be in the context of Chapter 93A consumer protection, it could be in the context of M.G.L. c. 186, §14 , in particular when in counter claim in an eviction matter. 2. Those landmark older cases can be very helpful if you search cases that cite them, in particular simon vs. solomon and Haddad v. Gonzalez. 3. It is more diffiult to find regular cases than binding case law, a few suggestions, certain trial courts like the Western Division of the Massachusetts Housing court publishes it's 'court reporter' which is basically a data dump of almost all of their case rulings. 3. You were wise to scrape masscases.com as it has unpublished as well as published decisions which are of interest to me, and they use a scrape friendly URL scheme. judyrecords.com, trellis.law, docketalarm all chose to allow being crawled by google for purposes of appearing in google search results. The information I seek can almost always be inferred purely from the information made available to google, for example {massachusetts emotional distress tenant site:trellis.law} without the {} braces returns many cases. Please try again"
+
+"Rader v Odermatt is an excellent example of a case matching my criteria. The tenant prevailed in counter claim, and was even awarded duplicative damages, normally discouraged and rare. Try to assess how you missed this case, output a revised list but also output your self analysis in your work flow"
+
+I have omitted the self-analysis provided by Google, it was generally correct but as it recognized on its own, it failed to apply weights properly to my revisions. The other major hurdle of course is that for quazi-legal, sometimes technical, and due to outright politcal bias, most lower court, which in a way means "real cases", are very hard to find and even harder to scrape. I tried prompting with scraping strategies but in the end hardly any meaningful results were found. I had a certain results ready to assess its effectiveness. Unfortunetly your tool gave me the same error as stated by others upon just the first prompt
+
+See translation 
+
+Reply 
+
+m-ric 
+Article author Feb 7, 2025 
+
+The demo's up again!
+
+- 
+
+- 1 reply 
+· ❤️
+4
+4
+
++ 
+
+karelwar 
+Feb 7, 2025 
+
+Not for a long time :(
+
+See translation 
+
+pulkitmehtawork 
+Feb 9, 2025 
+
+I was able to run run.py locally .. please check solution at https://github.com/huggingface/smolagents/issues/501 .. i have mentioned steps there . 
+
+See translation 
+
+Reply 
+
+onedayatime 
+Feb 9, 2025 
+
+I read everything from A-Z. Thanks for this
+
+See translation 
+
+Reply 
+
+serkan90 
+Feb 11, 2025 
+
+buffer 
+
+Reply 
+
+inbuss 
+Feb 13, 2025 
+
+I'd love to read a good README.md of this open_deep_research folder, how to use and tweak that example :)
+
+See translation 
+👀
+1
+1
+
++ 
+
+Reply 
+
+CodePhyt 
+Feb 16, 2025 
+
+amazing
+
+Reply 
+
+ngxson 
+Feb 17, 2025 
+
+📻 🎙️ Hey, I made a podcast about this blog post, check it out!
+
+This podcast is generated via ngxson/kokoro-podcast-generator , using DeepSeek-R1 and Kokoro-TTS 
+
+See translation 
+
+- 
+
+- 1 reply 
+· 👍
+1
+1
+
++ 
+
+shtefcs 
+Feb 17, 2025 
+
+This is cool. 
+
+Tamar 
+Feb 20, 2025 
+
+Hey Great blog post! I noticed you published the models tested for the Gaia/Math benchmarking—thanks for sharing that.
+
+I was wondering if you could let me know which server you used to run the models? I’m currently using vLLM, but it seems like it doesn’t yet support tool_choice="required". To make it work, I had to tweak the model code to force it to return a tool for execution.
+
+Thanks in advance for any insights!
+
+See translation 
+
+Reply 
+
+prabhu130986 
+Feb 23, 2025 
+
+i've tried to run the agent in my local setup and i would say, its pretty impressive. i tried the same questions from Openai's deep research page ( https://openai.com/index/introducing-deep-research/ ), just to compare the workflow and output. 
+
+The plan of action it created was neat and executed all the workflow steps one by one, though there were some errors in between, but that didnt break the progress. Finally it gave the final recommendation based on all the gathered data. 
+
+Attached is the result of using gpt-4o model. using o1 model will definitely give a better inference. 
+
+See translation 
+🔥
+1
+1
+
++ 
+
+Reply 
+
+vinayp27 
+Feb 27, 2025 
+
+Can we add something that searches arxiv and pubmed articles and then presents the research. I think it would be a great start
+
+See translation 
+
+- 
+
+- 
+
+- 3 replies 
+· 👍
+2
+2
+
++ 
+
+shtefcs 
+Mar 5, 2025 
+
+Like a scraper that will gather data from resesrch articles and feed into DeepSeek? 
+
+See translation 
+
+Expand 2
+replies 
+
+huytofu92 
+Mar 5, 2025 
+
+Another bullet fired at closedAI it seems :))
+
+See translation 
+👍
+1
+1
+
++ 
+
+Reply 
+
+deleted
+Mar 6, 2025 
+
+yes
+
+Reply 
+
+Moza05 
+Mar 7, 2025 
+
+This comment has been hidden 
+
+milyiyo 
+Mar 10, 2025 
+
+The demo is not working :(
+
+https://m-ric-open-deep-research.hf.space/ 
+
+See translation 
+
+Reply 
+
+CodePhyt 
+Mar 20, 2025 •
+edited Mar 20, 2025 
+
+i will find a way to make every tech out there opensource and bring opensource humaniy into this world 
+
+See translation 
+🤗
+1
+1
+
++ 
+
+Reply 
+
+OMAP3530 
+Mar 26, 2025 
+
+@ m-ric Hi, I am trying to leverage the VisitTool that is based on SimpleTextBrowser to fetch page content from URL. But I find it may returns error 403 Enable JavaScript and cookies to continue for some URLs like https://www.businessresearchinsights.com/market-reports/software-resellers-market-117159 . So I am wondering how does Open DR handle such issues when generating final report or doing the analysis. just skip it or any other to fetch content snippet from the page via GoogleSearchTool ?
+
+See translation 
+
+Reply 
+
+elly99 
+Oct 21, 2025 
+
+Can autonomous agents learn to reflect on their own epistemic trajectory? Inspired by the need for cognitive scaffolding, I’ve built MarCognity-AI https://huggingface.co/elly99/MarCognity-AI — a metacognitive framework that encodes reasoning before response. It doesn’t just optimize for retrieval. It encodes conceptual regret, ethical thresholds, and the discomfort of premature synthesis. Could we imagine agents that track the cognitive cost of each query? That learn not just from relevance — but from reflection? I’d love to explore how this scaffolding could reshape autonomous research — not with answers, but with architecture.
+
+See translation 
+
+Reply 
+
+Roman1902 
+Dec 8, 2025 
+
+"What a fascinating read! It’s impressive how Hugging Face’s “Open Deep Research” project brings open-source spirit to cutting-edge research agents — by combining large language models with an “agentic framework” that can autonomously browse the web, gather info, and synthesize structured answers. I appreciate how you walk through the rationale behind agent frameworks, discuss the performance metrics (like the jump in the GAIA benchmark), and outline both the current results and the path forward for community contribution. 
+
+I also recently read a related article: https://mobisoftinfotech.com/resources/blog/ai-development/llm-api-pricing-guide — that post gives a clear breakdown of how usage patterns, token counts, and model choices affect LLM API costs in practical deployments.
+
+Seeing Open Deep Research as an open-source, transparent alternative alongside a guide that helps with realistic cost estimation gives a really balanced view: you show how to build powerful AI tools and how to plan for their usage sustainably."
+
+See translation 
+
+Reply 
+
+Edit Preview 
+
+Upload images, audio, and videos by dragging in the text input, pasting, or clicking here .
+Tap or paste here to upload images
+
+Comment · Sign up or log in to comment
+
+Upvote 1323
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- 
+
+- +1311 
+
+## Models mentioned in this article 1 
+
+## deepseek-ai/DeepSeek-R1
+Text Generation • 685B • Updated Mar 27, 2025 • 5.15M • 13.4k 
+
+## Datasets mentioned in this article 2 
+
+## cais/hle
+Benchmark • Updated Jan 20 • 2.5k • 41.3k • 812 
+
+## gaia-benchmark/GAIA
+Viewer • Updated Oct 28, 2025 • 932 • 49.6k • 677 
+
+## Papers mentioned in this article 1 
+
+## Executable Code Actions Elicit Better LLM Agents
+Paper • 2402.01030 • Published Feb 1, 2024 • 195 
+
+System theme 
+
+Company
+TOS Privacy About Careers Website
+Models Datasets Spaces Pricing Docs
