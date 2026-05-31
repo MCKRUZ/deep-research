@@ -1,125 +1,59 @@
-# research-agent
+# deep-research
 
-An adaptive multi-agent research CLI that produces **citation-verified** Markdown
-reports. Built on the Anthropic Messages API.
+A Claude Code **skill** that turns any "research X for me" request into a
+**citation-verified report**. It scopes the question, fans out parallel research
+sub-agents proportional to complexity, verifies every citation against its source,
+then synthesizes — all inside your normal Claude Code session, on your
+subscription, using the tools and MCP servers you already have.
 
-It runs a four-stage pipeline — **Scope → Research → Verify → Write** — with an
-orchestrator that fans out parallel sub-agents, gated by a complexity classifier
-so trivial queries don't pay the multi-agent token tax. Every cited claim is
-checked against its source before the report ships.
+> This project began as a standalone Python app (Anthropic Messages API). It was
+> retired in favor of a skill — same playbook, zero infrastructure, no API
+> billing, native sub-agents. See `docs/adr/0002-pivot-to-claude-code-skill.md`
+> for the why. The app is recoverable from git history (commit `3203ee2`) if a
+> headless/scheduled service is ever needed.
 
-## Why it's built this way
+## What's here
 
-See `docs/superpowers/specs/2026-05-31-research-agent-design.md` (design) and
-`docs/adr/0001-orchestration-on-anthropic-sdk.md` (why we own the orchestration
-instead of leaning on the Claude Code CLI engine).
+| Path | What it is |
+|---|---|
+| `skills/deep-research/SKILL.md` | The skill (version-controlled source). |
+| `docs/superpowers/specs/…-design.md` | Original architecture/design spec. |
+| `docs/adr/0001-…` | Why orchestration was built on the Anthropic API (app era). |
+| `docs/adr/0002-…` | Why we pivoted from app → skill. |
+| `_research/` | Primary sources gathered while designing (Anthropic multi-agent, OpenAI/Tongyi deep research, STORM, LangChain ODR, search-backend comparisons). |
 
 ## Install
 
+The skill is installed at `~/.claude/skills/deep-research/SKILL.md`. To reinstall
+from this repo, copy it there:
+
 ```bash
-python -m pip install -e ".[dev]"
+cp skills/deep-research/SKILL.md ~/.claude/skills/deep-research/SKILL.md
 ```
 
-Requires Python ≥ 3.11.
-
-## Configure
-
-Copy `.env.example` to `.env` and fill in what you have:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...     # required
-TAVILY_API_KEY=tvly-...          # optional: best web search
-SEARXNG_URL=http://localhost:8080 # optional: free self-hosted web search
-GITHUB_TOKEN=ghp_...             # optional: higher GitHub rate limits
-```
-
-Only `ANTHROPIC_API_KEY` is required. arXiv, Semantic Scholar, and GitHub work
-without keys (GitHub is rate-limited without a token). No secret is ever
-hardcoded; all come from the environment or `.env`.
+(On Windows: `Copy-Item skills\deep-research\SKILL.md $HOME\.claude\skills\deep-research\SKILL.md`.)
 
 ## Use
 
-```bash
-# Interactive: asks up to 3 clarifying questions, then runs autonomously
-research "Compare vector databases for RAG at scale"
+Just ask, in any Claude Code session:
 
-# Non-interactive (scripting): skip clarification
-research "What is retrieval-augmented generation?" --yes
+- "Research the current landscape of vector databases for RAG at scale."
+- "Go deep on how Anthropic and OpenAI differ on prompt caching."
+- "Compare LangGraph, CrewAI, and Pydantic AI for building agents."
 
-# Budget knob: low | medium | high
-research "Survey autonomous research agents in 2026" --effort high
+Claude loads the skill and runs **Scope → Gauge → Research → Verify → Write**,
+returning a Markdown report with `[n]` citations, a Sources list, and a short
+verification note. It asks up to 3 clarifying questions first unless you say
+"just go."
 
-# Also write the report to a path
-research "..." --yes --out report.md
-```
+## The playbook (what the skill encodes)
 
-Each run writes artifacts to `runs/<run-id>/`:
+1. **Scope** — clarify, then compress to an objective + independent sub-questions.
+2. **Gauge** — simple/standard/deep → 0 / 2–3 / 4–6 parallel sub-agents (don't over-spawn).
+3. **Research** — one `Task` sub-agent per sub-question, concurrent, each returning compressed cited findings.
+4. **Verify** — every cited claim checked against its source; unsupported claims flagged.
+5. **Write** — synthesize a cited report with a Sources list and verification note.
 
-- `report.md` — the final cited report
-- `report.json` — structured report (citations, verified claims, usage)
-- `trace.json` — tier, budget, sources, cost (no source contents)
-- stage checkpoints (`brief.json`, …)
-
-## Evaluate
-
-```bash
-research-eval                # run the LLM-as-judge harness over seed queries
-research-eval --out eval.json
-```
-
-Scores each report on a 1–5 rubric (factual accuracy, citation accuracy,
-completeness, source quality) and reports per-case and mean scores. Seed queries
-live in `src/research_agent/eval/seeds.py` — add your real queries over time.
-
-## Architecture
-
-```
-research "<q>"
-   │
-   ▼ Scope        clarify (≤3 Qs) → research brief (north star)
-   ▼ Classify     complexity tier → budget (sub-agent count, tool/token caps)
-   ▼ Research     orchestrator (Opus) → parallel sub-agents (Sonnet) → compress
-   ▼ Verify       every cited claim checked against its source; unsupported flagged
-   ▼ Write        synthesize cited report; authoritative Sources appended from data
-   ▼
-report.md + trace
-```
-
-### Module map
-
-| Module | Role |
-|---|---|
-| `llm/base.py` | `LLMClient` protocol, tool/message types |
-| `llm/anthropic_client.py` | production client (Messages API, retries, cost) |
-| `llm/fake.py` | deterministic test client |
-| `llm/agent.py` | the bounded tool-use loop + JSON helpers |
-| `pipeline/scope.py` | clarifier + brief |
-| `pipeline/classifier.py` | complexity gate + budgets |
-| `pipeline/orchestrator.py` | parallel fan-out + source merge |
-| `pipeline/subagent.py` | one sub-agent's research loop |
-| `pipeline/verify.py` | citation-faithfulness pass |
-| `pipeline/write.py` | report synthesis |
-| `pipeline/report.py` | final Markdown assembly |
-| `tools/` | swappable search providers (arXiv, Semantic Scholar, GitHub, Tavily, SearXNG) |
-| `eval/` | LLM-as-judge harness + rubric + seeds |
-| `state.py` | run checkpoints + artifacts |
-
-## Test
-
-```bash
-python -m pytest -q
-```
-
-No network or API keys needed — the suite runs entirely on the fake client and
-mocked HTTP.
-
-## Cost note
-
-Uses per-token Anthropic API billing. Model IDs and price estimates are
-configurable in `config.py`. The complexity gate is the primary cost lever:
-simple queries stay single-agent; only broad, open-ended research fans out.
-
-## Roadmap (phase 2)
-
-API service, mid-run steering, local/non-Claude models via the `LLMClient` seam,
-PDF export, `--resume` wiring, and a larger eval set.
+Grounded in the patterns from `_research/`: Anthropic's orchestrator-worker
+multi-agent system, the Scope→Research→Write shape from LangChain Open Deep
+Research, STORM's report synthesis, and rubric-based evaluation.
