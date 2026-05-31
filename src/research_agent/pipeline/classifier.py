@@ -61,9 +61,14 @@ async def classify(
         f"Sub-questions: {brief.sub_questions}\n"
         f"Original query: {brief.query}"
     )
-    data, usage = await complete_json(
-        client, model=settings.utility_model, system=_SYSTEM, user=user, max_tokens=300
-    )
+    try:
+        data, usage = await complete_json(
+            client, model=settings.utility_model, system=_SYSTEM, user=user, max_tokens=300
+        )
+    except ValueError:
+        return ComplexityTier.standard, Usage()
+    if not isinstance(data, dict):
+        return ComplexityTier.standard, usage
     raw = str(data.get("tier", "standard")).lower().strip()
     try:
         tier = ComplexityTier(raw)

@@ -19,6 +19,13 @@ def test_extract_claims_ignores_uncited_text():
     assert extract_claims("No citations here at all.") == []
 
 
+def test_extract_claims_handles_comma_markers_and_drops_fragments():
+    # [1, 2] comma style should parse both ids; a lone "[3]" fragment is dropped.
+    claims = extract_claims("Alpha fact [1, 2]. [3]")
+    assert len(claims) == 1
+    assert claims[0].citation_ids == [1, 2]
+
+
 async def test_verify_flags_unsupported(settings):
     client = FakeLLMClient(
         router=lambda *a: text_response(json.dumps({"supported": False, "note": "not in source"}))

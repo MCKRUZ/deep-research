@@ -66,3 +66,11 @@ async def test_build_brief_falls_back_when_empty(settings):
     brief, _ = await build_brief(client, settings, "raw query", [])
     assert brief.objective == "raw query"
     assert brief.sub_questions == ["raw query"]
+
+
+async def test_build_brief_degrades_on_list_json(settings):
+    # Regression: non-dict JSON must degrade to a query-only brief, not crash.
+    client = FakeLLMClient(responses=[text_response(json.dumps(["x", "y"]))])
+    brief, _ = await build_brief(client, settings, "raw query", [])
+    assert brief.objective == "raw query"
+    assert brief.sub_questions == ["raw query"]

@@ -34,3 +34,18 @@ async def test_classify_defaults_on_garbage(settings):
     brief = Brief(query="q", objective="o", sub_questions=["a"])
     tier, _ = await classify(client, settings, brief)
     assert tier is ComplexityTier.standard
+
+
+async def test_classify_degrades_on_list_json(settings):
+    # Regression: a non-dict JSON response must degrade, not crash.
+    client = FakeLLMClient(responses=[text_response(json.dumps(["a", "b"]))])
+    brief = Brief(query="q", objective="o", sub_questions=["a"])
+    tier, _ = await classify(client, settings, brief)
+    assert tier is ComplexityTier.standard
+
+
+async def test_classify_degrades_when_no_valid_json(settings):
+    client = FakeLLMClient(responses=[text_response("not json"), text_response("still not")])
+    brief = Brief(query="q", objective="o", sub_questions=["a"])
+    tier, _ = await classify(client, settings, brief)
+    assert tier is ComplexityTier.standard

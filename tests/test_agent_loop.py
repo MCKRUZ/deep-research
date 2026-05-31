@@ -45,6 +45,20 @@ async def test_run_agent_enforces_tool_budget():
     assert result.tool_calls_made == 2  # never exceeds the cap
 
 
+async def test_budget_exhaust_keeps_role_alternation():
+    # Regression: the forced-final path must not emit two consecutive user turns
+    # (the Anthropic API rejects that). Model always wants the tool.
+    recorder: list[str] = []
+    client = FakeLLMClient(router=lambda *a: tool_response("echo", {"query": "x"}))
+    result = await run_agent(
+        client=client, model="m", system="s", user="go",
+        tools=[_echo_tool(recorder)], max_tool_calls=1,
+    )
+    roles = [m["role"] for m in result.transcript]
+    for a, b in zip(roles, roles[1:]):
+        assert a != b, f"consecutive {a} messages: {roles}"
+
+
 async def test_run_agent_surfaces_tool_error_without_crashing():
     async def boom(args: dict) -> str:
         raise ValueError("kaboom")

@@ -50,17 +50,20 @@ class AnthropicClient:
             kwargs["tools"] = [t.wire() for t in tools]
 
         last_exc: Exception | None = None
-        for attempt in range(self._settings.max_retries):
+        retries = self._settings.max_retries
+        for attempt in range(retries):
             try:
                 resp = await self._client.messages.create(**kwargs)
                 break
             except (RateLimitError, APIConnectionError) as exc:
                 last_exc = exc
-                await asyncio.sleep(min(2**attempt, 8))
+                if attempt < retries - 1:
+                    await asyncio.sleep(min(2**attempt, 8))
             except APIStatusError as exc:
                 if exc.status_code and 500 <= exc.status_code < 600:
                     last_exc = exc
-                    await asyncio.sleep(min(2**attempt, 8))
+                    if attempt < retries - 1:
+                        await asyncio.sleep(min(2**attempt, 8))
                     continue
                 raise
         else:

@@ -33,9 +33,12 @@ _BRIEF_SYSTEM = (
 async def generate_questions(
     client: LLMClient, settings: Settings, query: str
 ) -> tuple[list[str], Usage]:
-    data, usage = await complete_json(
-        client, model=settings.utility_model, system=_CLARIFY_SYSTEM, user=query, max_tokens=400
-    )
+    try:
+        data, usage = await complete_json(
+            client, model=settings.utility_model, system=_CLARIFY_SYSTEM, user=query, max_tokens=400
+        )
+    except ValueError:
+        return [], Usage()
     questions = data.get("questions", []) if isinstance(data, dict) else []
     cleaned = [str(q).strip() for q in questions if str(q).strip()][:3]
     return cleaned, usage
@@ -49,9 +52,14 @@ async def build_brief(
 ) -> tuple[Brief, Usage]:
     qa = "\n".join(f"Q: {c.question}\nA: {c.answer}" for c in clarifications)
     user = f"Research request: {query}\n\nClarifying Q&A:\n{qa or '(none)'}"
-    data, usage = await complete_json(
-        client, model=settings.subagent_model, system=_BRIEF_SYSTEM, user=user, max_tokens=1200
-    )
+    try:
+        data, usage = await complete_json(
+            client, model=settings.subagent_model, system=_BRIEF_SYSTEM, user=user, max_tokens=1200
+        )
+    except ValueError:
+        data, usage = {}, Usage()
+    if not isinstance(data, dict):
+        data = {}
     objective = str(data.get("objective", query)).strip() or query
     sub_questions = [str(s).strip() for s in data.get("sub_questions", []) if str(s).strip()]
     if not sub_questions:

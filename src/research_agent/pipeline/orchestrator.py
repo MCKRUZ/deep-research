@@ -61,10 +61,11 @@ async def run_research(
         total = total.add(sr.usage)
         local_cites: list[Citation] = []
         for res in sr.results:
-            cid = url_to_id.get(res.url)
+            key = res.url.strip().rstrip("/")  # dedup near-identical URLs
+            cid = url_to_id.get(key)
             if cid is None:
                 cid = len(citations) + 1
-                url_to_id[res.url] = cid
+                url_to_id[key] = cid
                 citations.append(
                     Citation(
                         id=cid, url=res.url, title=res.title, source_type=res.source_type

@@ -99,12 +99,22 @@ async def run_agent(
             except Exception as exc:  # surface to the model, do not crash the run
                 out = f"Tool '{tc.name}' failed: {exc}. Try a different query or tool."
             results.append(_result_block(tc.id, out))
+
+        budget_hit = calls >= max_tool_calls
+        if budget_hit:
+            # Fold the stop instruction into the SAME user turn as the tool
+            # results — appending a second user message would break the
+            # assistant/user alternation the API requires.
+            results.append(
+                {
+                    "type": "text",
+                    "text": "Budget reached. Provide your final answer now from the "
+                    "evidence gathered.",
+                }
+            )
         messages.append({"role": "user", "content": results})
 
-        if calls >= max_tool_calls:
-            messages.append(
-                {"role": "user", "content": "Budget reached. Provide your final answer now."}
-            )
+        if budget_hit:
             final = await client.complete(
                 system=system,
                 messages=messages,

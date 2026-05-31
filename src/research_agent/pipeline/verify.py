@@ -15,7 +15,8 @@ from research_agent.llm.agent import complete_json
 from research_agent.llm.base import LLMClient
 from research_agent.models import Claim, Usage
 
-_MARKER_RE = re.compile(r"\[(\d+)\]")
+_MARKER_RE = re.compile(r"\[([\d,\s]+)\]")  # matches [1], [2][3], and [1, 2]
+_ALPHA_RE = re.compile(r"[A-Za-z]")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 _MAX_CLAIMS = 40  # cost guard; verify the first N cited sentences
 _SOURCE_CHARS = 2000
@@ -32,9 +33,16 @@ def extract_claims(markdown: str) -> list[Claim]:
     claims: list[Claim] = []
     for sentence in _SENTENCE_SPLIT.split(markdown):
         text = sentence.strip()
-        ids = sorted({int(m) for m in _MARKER_RE.findall(text)})
-        if ids:
-            claims.append(Claim(text=text, citation_ids=ids))
+        ids: set[int] = set()
+        for group in _MARKER_RE.findall(text):
+            for part in group.split(","):
+                part = part.strip()
+                if part.isdigit():
+                    ids.add(int(part))
+        # skip content-free fragments (a lone "[1]" split off after a period)
+        body = _MARKER_RE.sub("", text)
+        if ids and _ALPHA_RE.search(body):
+            claims.append(Claim(text=text, citation_ids=sorted(ids)))
     return claims
 
 
