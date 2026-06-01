@@ -88,6 +88,17 @@ blocks; cite claims inline with `<a class="cite" href="#s3">3</a>`), and `{{SOUR
 use tag class `web`/`academic`/`code`). Keep it one self-contained file (no external assets); it's
 print-friendly. Save it alongside the Markdown and offer to open it.
 
+### Where to save (output protocol)
+Reports always go to a predictable location — never the current directory ad hoc:
+1. **Project root** = the git repo root (`git rev-parse --show-toplevel`); if not in a repo, the
+   current working directory.
+2. Save into a **`research/`** folder at that root (create it if missing). If the project already
+   has `_research/` or `docs/research/`, use that existing folder instead.
+3. **No project** (you're in a home/temp dir with no repo) → use **`~/research/`**.
+4. **Filenames:** `YYYY-MM-DD-<slug>.md` and the matching `.html`, where `<slug>` is a 3–6 word
+   kebab-case summary of the objective (e.g. `2026-06-01-vector-db-rag-landscape.md`).
+5. Always tell the user the **exact path(s)** written.
+
 ## Tool map (this environment)
 
 - **General web:** `WebSearch` → `WebFetch` for full pages. If `WebFetch` is blocked or
