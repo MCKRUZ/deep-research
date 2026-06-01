@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Community Sentiment: Building Deep Research Agents</title>
+<style>
+  :root{
+    --ink:#1a1a2e; --muted:#5b6472; --line:#e6e8ee; --bg:#ffffff;
+    --accent:#4f46e5; --accent-soft:#eef0ff;
+    --ok-bg:#e9f8ef; --ok-ink:#1c7a45; --warn-bg:#fdf3e3; --warn-ink:#a15c14;
+    --web:#3b82f6; --academic:#8b5cf6; --code:#10b981; --tag-ink:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.7 Georgia,"Iowan Old Style",Charter,serif;padding:48px 20px 96px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:2.1rem;line-height:1.2;letter-spacing:-.02em;margin:0 0 .35em;font-weight:800}
+  h1::after{content:"";display:block;width:64px;height:4px;border-radius:4px;background:var(--accent);margin-top:.5rem}
+  h2{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:1.4rem;font-weight:700;letter-spacing:-.01em;margin:2.4em 0 .5em}
+  h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:1.12rem;font-weight:700;margin:1.6em 0 .4em}
+  p{margin:0 0 1em}
+  .meta{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;color:var(--muted);margin:0 0 1.6rem;display:flex;flex-wrap:wrap;gap:.4rem 1.2rem}
+  .meta b{color:var(--ink);font-weight:600}
+  .verify{display:flex;align-items:center;gap:.6rem;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.92rem;border-radius:10px;padding:.7rem 1rem;margin:0 0 2rem}
+  .verify.ok{background:var(--ok-bg);color:var(--ok-ink)}
+  .verify .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+  .summary{background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:0 10px 10px 0;padding:1.1rem 1.3rem;margin:0 0 2rem;font-size:1.02rem}
+  .summary p:last-child{margin-bottom:0}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+  a.cite{font-size:.62em;vertical-align:super;font-weight:700;font-family:-apple-system,sans-serif;padding:0 .12em}
+  a.cite::before{content:"["}a.cite::after{content:"]"}
+  table{border-collapse:collapse;width:100%;font-size:.92rem;margin:1.2em 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  th,td{border-bottom:1px solid var(--line);padding:.55rem .6rem;text-align:left;vertical-align:top}
+  th{font-weight:700;background:#fafbfc}
+  blockquote{margin:1.2em 0;padding:.2em 0 .2em 1.1em;border-left:3px solid var(--line);color:var(--muted);font-style:italic}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em;background:#f4f5f8;padding:.1em .35em;border-radius:5px}
+  hr{border:none;border-top:1px solid var(--line);margin:2.4em 0}
+  .sources h2{margin-bottom:.8rem}
+  ol.srclist{list-style:none;margin:0;padding:0}
+  ol.srclist li{position:relative;padding:.7rem 0 .7rem 2.4rem;border-bottom:1px solid var(--line);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.93rem;line-height:1.5}
+  ol.srclist li .num{position:absolute;left:0;top:.7rem;width:1.7rem;height:1.7rem;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center}
+  ol.srclist .title{font-weight:600;color:var(--ink)}
+  ol.srclist .url{display:block;color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:.78rem;word-break:break-all;margin-top:.1rem}
+  .tag{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tag-ink);border-radius:5px;padding:.08rem .4rem;margin-left:.4rem;vertical-align:middle}
+  .tag.web{background:var(--web)}.tag.academic{background:var(--academic)}.tag.code{background:var(--code)}
+  footer{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);font-family:-apple-system,sans-serif;font-size:.78rem;color:var(--muted)}
+  @media (max-width:600px){body{padding:28px 16px 64px;font-size:17px}h1{font-size:1.7rem}}
+  @media print{body{padding:0;font-size:11pt;color:#000}a{color:#000}.summary,.verify{-webkit-print-color-adjust:exact;print-color-adjust:exact}h2{page-break-after:avoid}ol.srclist li{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Community Sentiment: Building Deep Research Agents</h1>
+  <div class="meta">
+    <span><b>Query:</b> What do practitioners think about building deep-research agents?</span>
+    <span><b>Depth:</b> deep</span>
+    <span><b>Date:</b> 2026-06-01</span>
+  </div>
+
+  <div class="verify ok"><span class="dot"></span><span>Sourced from Hacker News, GitHub, and Reddit · ~110 HN comments, 350+ GitHub issues, 45 Reddit posts · opinions attributed to threads, not fact-checked claims</span></div>
+
+  <div class="summary">
+    <p>Practitioners are <strong>useful-but-distrustful</strong>: today's deep-research agents are
+    excellent <em>research accelerators and source-finders</em> but poor <em>autonomous researchers</em>.
+    The loudest, most cross-source-consistent themes are (1) never trust unverified output — hallucinated
+    citations hide in long reports, and (2) stop over-engineering — most multi-agent systems are
+    over-built. Build-vs-buy consensus: buy the frontier product for general web research, build only
+    when data-locality forces it. Reddit adds genuine enthusiasm for fast-improving open-source agents.</p>
+  </div>
+
+  <section>
+    <h2>Tools — recommended vs. overhyped</h2>
+    <p>No single winner; choice is task-dependent. OpenAI Deep Research is respected as "narrow and deep"
+    but premium-priced and still hallucinates; Perplexity is "shallow and broad," fast and free, but takes
+    sources at face value.<a class="cite" href="#s2">2</a> The clearest negative sentiment targets the
+    <strong>"openTHING clone" pattern</strong> — "makers often overhype superficial repros and trivialize
+    the last mile."<a class="cite" href="#s3">3</a> Even the "Deep Research" / "PhD-level" branding draws
+    eye-rolls.<a class="cite" href="#s4">4</a></p>
+    <table>
+      <tr><th>Tool</th><th>Community read</th></tr>
+      <tr><td>OpenAI Deep Research</td><td>Best depth, premium price, still hallucinates — verify everything</td></tr>
+      <tr><td>Perplexity</td><td>Fast/free/good inline cites, but shallow; takes sources at face value</td></tr>
+      <tr><td>GPT Researcher</td><td>The OSS default to fork — mind the cost/budget gotchas</td></tr>
+      <tr><td>STORM</td><td>Academically respected, "verbose and shallow" in practice</td></tr>
+      <tr><td>ROMA / Tongyi (open)</td><td>Reddit-favored: open models now rivaling closed platforms</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>The loudest criticisms &amp; gotchas</h2>
+    <p><strong>Hallucinated, uncritically-weighted citations</strong> are the #1 complaint, in every
+    thread — and corroborated by 2026 eval literature finding 3–13% of cited URLs can be fabricated, so
+    "citation support" metrics overstate reliability.<a class="cite" href="#s7">7</a> <strong>Bland
+    "consulting-report" synthesis</strong> is the second: good for discovering sources, weak for final
+    answers. <strong>Cost/token blowup</strong> shows up concretely in GPT-Researcher's issue tracker
+    (budget guards, plan managers, checkpointing).<a class="cite" href="#s5">5</a> LangChain frames cost
+    and latency as open problems — "users don't want simple requests to take 10+ minutes."<a class="cite" href="#s6">6</a></p>
+  </section>
+
+  <section>
+    <h2>Build vs. buy</h2>
+    <p>Leans "buy the frontier product, build only the orchestration." The open clones can't replicate the
+    RL-trained frontier model at the core; Hugging Face's replication scored 54% on GAIA vs OpenAI's 67%
+    precisely because it "lacks o3."<a class="cite" href="#s3">3</a> Where people <em>do</em> build:
+    data-locality and custom-corpus use cases. Use GPT-Researcher / LangChain ODR as scaffolding, not the brain.</p>
+  </section>
+
+  <section>
+    <h2>Reddit signal (via the Apify <code>reddit_search</code> tool)</h2>
+    <p>Reddit echoes HN/GitHub and adds two things. First, <strong>genuine excitement about open-source
+    deep-research</strong>: ROMA ("beats every closed platform on Seal-0 and FRAMES")<a class="cite" href="#s9">9</a>
+    and Alibaba's Tongyi DeepResearch ("on par with OpenAI Deep Research at 30B / 3B active").<a class="cite" href="#s10">10</a>
+    Second, a strongly-upvoted <strong>"stop over-engineering your agents"</strong> backlash from a builder
+    of 25+ agents — "Rube Goldberg machines when you need a hammer."<a class="cite" href="#s8">8</a> That
+    makes <em>three independent sources</em> (Reddit, HN, Anthropic<a class="cite" href="#s1">1</a>) saying:
+    gauge complexity first, don't over-build.</p>
+  </section>
+
+  <section>
+    <h2>Bottom line</h2>
+    <p>The failure modes the community names — hidden fake citations, uncritical source-weighting, bland
+    synthesis — all attack the exact thing the product name promises. The recurring advice: treat output as
+    a launchpad, verify citations yourself, scale effort to the question, and build guardrails in from the
+    start. This independently validates the <code>deep-research</code> skill's design: a mandatory
+    citation-verification pass and a complexity gate.</p>
+  </section>
+
+  <hr>
+  <div class="sources">
+    <h2>Sources</h2>
+    <ol class="srclist">
+      <li id="s1"><span class="num">1</span><span class="title">Anthropic — How we built our multi-agent research system</span><span class="tag web">web</span><span class="url">https://www.anthropic.com/engineering/built-multi-agent-research-system</span></li>
+      <li id="s2"><span class="num">2</span><span class="title">Hacker News — OpenAI vs Perplexity deep-research depth discussion</span><span class="tag web">web</span><span class="url">https://news.ycombinator.com/item?id=43236184</span></li>
+      <li id="s3"><span class="num">3</span><span class="title">Hacker News — "openTHING clones" / HF Open Deep Research vs o3 (swyx)</span><span class="tag web">web</span><span class="url">https://news.ycombinator.com/item?id=42937701</span></li>
+      <li id="s4"><span class="num">4</span><span class="title">Hacker News — Tongyi DeepResearch &amp; "deep research" branding critique</span><span class="tag web">web</span><span class="url">https://news.ycombinator.com/item?id=45789602</span></li>
+      <li id="s5"><span class="num">5</span><span class="title">GitHub — assafelovic/gpt-researcher (cost/budget/checkpoint issues)</span><span class="tag code">code</span><span class="url">https://github.com/assafelovic/gpt-researcher/issues</span></li>
+      <li id="s6"><span class="num">6</span><span class="title">LangChain — Open Deep Research (architecture &amp; cost/latency)</span><span class="tag web">web</span><span class="url">https://blog.langchain.dev/open-deep-research/</span></li>
+      <li id="s7"><span class="num">7</span><span class="title">arXiv — reference-hallucination benchmark for deep-research agents</span><span class="tag academic">academic</span><span class="url">https://arxiv.org/html/2604.03173v1</span></li>
+      <li id="s8"><span class="num">8</span><span class="title">r/AI_Agents — "Stop building complex fancy AI Agents" (374↑)</span><span class="tag web">web</span><span class="url">https://www.reddit.com/r/AI_Agents/comments/1oheym9/</span></li>
+      <li id="s9"><span class="num">9</span><span class="title">r/LocalLLaMA — Open-source ROMA beats closed platforms on Seal-0/FRAMES (926↑)</span><span class="tag web">web</span><span class="url">https://www.reddit.com/r/LocalLLaMA/comments/1nctfdv/</span></li>
+      <li id="s10"><span class="num">10</span><span class="title">r/singularity — Alibaba Tongyi DeepResearch, open, 30B/3B-active (407↑)</span><span class="tag web">web</span><span class="url">https://www.reddit.com/r/singularity/comments/1nitd4i/</span></li>
+    </ol>
+  </div>
+
+  <footer>Generated by the deep-research skill · 2026-06-01 · sentiment from HN + GitHub + Reddit</footer>
+</div>
+</body>
+</html>

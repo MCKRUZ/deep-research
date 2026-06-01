@@ -78,6 +78,16 @@ Synthesize (don't concatenate) into Markdown:
 
 Offer to save the report to a file when it's long.
 
+**Polished HTML report (when the user wants a nicely-formatted deliverable, or asks for HTML):**
+also render the report as a self-contained HTML file by cloning `report-template.html` (in this
+skill folder) and filling its slots — `{{TITLE}}`, `{{QUERY}}`, `{{TIER}}`, `{{DATE}}`, the
+verification banner (`{{VERIFY_CLASS}}` = `warn` if any claim is flagged else `ok`; `{{VERIFY_TEXT}}`
+e.g. "18 checked · 17 supported · 1 flagged"), `{{SUMMARY}}`, `{{BODY}}` (`<section><h2>…</h2><p>…</p></section>`
+blocks; cite claims inline with `<a class="cite" href="#s3">3</a>`), and `{{SOURCES}}`
+(`<li id="s1"><span class="num">1</span><span class="title">…</span><span class="tag web">web</span><span class="url">…</span></li>`;
+use tag class `web`/`academic`/`code`). Keep it one self-contained file (no external assets); it's
+print-friendly. Save it alongside the Markdown and offer to open it.
+
 ## Tool map (this environment)
 
 - **General web:** `WebSearch` → `WebFetch` for full pages. If `WebFetch` is blocked or
