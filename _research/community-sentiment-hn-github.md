@@ -70,3 +70,41 @@ Buy the frontier product for general work; build only for data-locality; never s
 (Verify) pass and "Verified only if fetched" rule target the #1 community complaint; the complexity
 gate targets the cost/latency complaints; "start broad then narrow" and parallel sub-agents are in
 the skill already.
+
+---
+
+## Reddit signal (added 2026-06-01, via the new Apify `reddit_search`)
+
+> Method: 5 site-wide searches via the Apify Fast Reddit Scraper (post-level, no comments),
+> 45 posts. Site-wide relevance ranking pulled in noise (viral AI posts unrelated to building
+> research agents); below is the on-topic subset. A subreddit-targeted pull (r/LocalLLaMA,
+> r/LLMDevs, r/AI_Agents) would be cleaner next time.
+
+**Reddit largely echoes HN/GitHub, and adds two things:**
+
+1. **Open-source deep-research is catching up — and Reddit is excited about it.** Two of the
+   highest-signal on-topic posts are open-model wins: **ROMA** ("open-source Deep Research repo
+   beats every existing closed-source platform on Seal-0 and FRAMES" — *recursion + multi-agent +
+   search tool*, r/LocalLLaMA, 926↑/119c) and **Alibaba Tongyi DeepResearch** ("first fully
+   open-source Web Agent on par with OpenAI Deep Research, 30B / 3B active", r/singularity, 407↑).
+   Sentiment: genuine enthusiasm that small open models now rival billion-dollar closed ones —
+   more bullish on OSS than HN, which was skeptical of "openTHING clones."
+
+2. **A strong "stop over-engineering your agents" backlash** — the standout opinion post:
+   r/AI_Agents, *"Stop building complex fancy AI Agents"* (374↑/95c) from a builder of 25+ agents:
+   "most of you are building **Rube Goldberg machines when you need a hammer**." This directly
+   echoes HN's "openTHING clones disappoint" and Anthropic's "don't build an agent when a workflow
+   will do" — the **gauge-complexity-first** discipline is community-validated from three independent
+   sources now.
+
+**Reinforced (consistent with HN/GitHub):**
+- **Hallucination/reliability anxiety is pervasive** across r/ChatGPT and friends (the AI-court-
+   filing hallucination saga, the fabricated-disease-believed-by-AI post) — reinforces the #1 gotcha:
+   never ship unverified output. Tool roundups flag it too (r/ChatGPTPro "Best AI Tools 2026": Manus
+   "can hallucinate on long research").
+- **Perplexity Deep Research** is actively marketed as SOTA on Law/Medicine/Academic (r/perplexity_ai,
+   408↑) — vendor framing; treat as directional, same mixed pattern HN reported.
+
+**Net:** Reddit confirms the picture and is the most positive of the three sources on open-source
+deep-research agents (ROMA, Tongyi), while independently validating the "don't over-build" and
+"verify everything" lessons the skill already encodes.
