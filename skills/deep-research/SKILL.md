@@ -91,7 +91,7 @@ Offer to save the report to a file when it's long.
 - **Code / repos:** `gh search repos` / `gh search code`; the GitHub Bifrost server for
   multi-step repo exploration.
 - **Video:** `YouTube` (Bifrost) for transcripts and conference talks.
-- **Community sentiment:** `Reddit` (Bifrost) for real-world experience and gotchas.
+- **Community sentiment (Reddit):** use the `reddit_search` tool (Bifrost, Apify-backed) — it returns Reddit posts/bodies/upvotes without Reddit API creds and bypasses Reddit's bot block. Also good: Hacker News (WebSearch + the HN Algolia API) and GitHub issues. (The legacy official-API `Reddit` MCP is blocked — prefer `reddit_search`.)
 - **Tangled trade-offs:** `sequential_thinking` (Bifrost) to reason through hard choices.
 
 ## Common mistakes
